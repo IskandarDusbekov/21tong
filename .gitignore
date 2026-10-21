@@ -224,3 +224,4 @@ node_modules/
 miniapp/dist/
 backend/media/
 backend/staticfiles/
+panel/dist/

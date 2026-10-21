@@ -1,6 +1,7 @@
 import { BookOpen, CheckCircle2, Coins, Dumbbell, Footprints, Target } from "lucide-react";
 import { api } from "../api.js";
 import { Empty, ErrorCard, Skeleton, useAction, useLoad } from "../ui.jsx";
+import PhotoChallenge from "./PhotoChallenge.jsx";
 
 // Sarlavhaga qarab mos ikonka (aks holda — nishon)
 const ICON_RULES = [
@@ -28,6 +29,9 @@ export default function Bounties({ me, reloadMe }) {
         </div>
       </div>
 
+      <PhotoChallenge />
+
+      <div className="section-title">Kunduzgi topshiriqlar</div>
       {error && !data && <ErrorCard text={error} />}
       {!data && !error && <div className="stack"><Skeleton height={110} /><Skeleton height={110} /></div>}
       {data?.length === 0 && <Empty icon={Target} title="Bugun topshiriq yo'q" text="Yangi Bounty'lar admin tomonidan e'lon qilinadi." />}

@@ -1,11 +1,26 @@
 import { useState } from "react";
 import {
-  AlarmClock, BedDouble, Check, CheckCircle2, Clock, Coins, Hourglass, Lock, Mic,
-  Moon, Snowflake, Spade, Sun, Sunrise, Video, XCircle,
+  AlarmClock, Ban, BedDouble, Check, CheckCircle2, Clock, Coins, Hourglass, Lock, Megaphone, Mic,
+  Moon, Send, ShieldCheck, Snowflake, Sun, Sunrise, Timer, Users, Video, XCircle,
 } from "lucide-react";
 import { api } from "../api.js";
-import { Empty, ErrorCard, Sheet, Skeleton, useAction } from "../ui.jsx";
-import { STAGE_ICONS } from "./Journey.jsx";
+import { Avatar, Empty, ErrorCard, haptic, Sheet, Skeleton, useAction, useLoad } from "../ui.jsx";
+import { sound } from "../sound.js";
+import { stageIcon } from "./Journey.jsx";
+
+/** "Uyg'ondim" marosimi — quyosh portlashi, bir lahzaga to'liq ekran. */
+function WakeRitual() {
+  return (
+    <div className="ritual" role="status" aria-label="Xayrli tong">
+      <div className="ritual-sun">
+        <Sunrise size={64} />
+        <span className="ritual-rays" />
+      </div>
+      <b className="ritual-text">Xayrli tong, jangchi!</b>
+      <small>Bugun kechagidan kuchliroqsan</small>
+    </div>
+  );
+}
 
 function DayRing({ day, total }) {
   const r = 42;
@@ -36,11 +51,11 @@ function DayRing({ day, total }) {
 
 function Hero({ me }) {
   const { membership: m, today: t, journey: j } = me;
-  const StageIcon = j.stage ? STAGE_ICONS[j.stage.code] : Sunrise;
+  const StageIcon = j.stage ? stageIcon(j.stage) : Sunrise;
   return (
     <section className="hero">
       <div className="hero-top">
-        <span>{m.tribe}</span>
+        <span>{m.squad ? <><b>{m.squad}</b> · </> : null}{m.tribe}</span>
         <span className="chip"><StageIcon size={14} />{j.stage ? j.stage.name : "Yangi boshlovchi"}</span>
       </div>
       <div className="hero-main">
@@ -63,15 +78,15 @@ function Stats({ me }) {
     <div className="stats">
       <div className="stat">
         <div className="stat-icon" style={{ background: "var(--bad-soft)", color: "var(--bad)" }}><XCircle size={17} /></div>
-        <div className="strike-dots" aria-label={`${strikes} ta strike`}>
+        <div className="strike-dots" aria-label={`${strikes} ta ogohlantirish`}>
           {Array.from({ length: me.max_strikes }, (_, i) => <i key={i} className={i < strikes ? "on" : ""} />)}
         </div>
-        <small>Strike</small>
+        <small>Ogohlantirish</small>
       </div>
       <div className="stat">
-        <div className="stat-icon" style={{ background: "var(--rest-soft)", color: "var(--rest)" }}><Spade size={17} /></div>
-        <b className="num">{me.jokers}</b>
-        <small>Joker</small>
+        <div className="stat-icon" style={{ background: "var(--rest-soft)", color: "var(--rest)" }}><ShieldCheck size={17} /></div>
+        <b className="num">{me.immunities}</b>
+        <small>Immunitet</small>
       </div>
       <div className="stat">
         <div className="stat-icon" style={{ background: "color-mix(in srgb, #d99b1c 16%, transparent)", color: "#c98400" }}><Coins size={17} /></div>
@@ -124,38 +139,33 @@ function Link({ icon: Icon, state, title, tag, hint, children }) {
 }
 
 function Chain({ t, gender, rules }) {
-  const videoState = !t.video_required
-    ? "locked"
-    : t.video === "approved" ? "done"
-    : t.video === "rejected" ? "failed"
-    : t.voice ? "active" : "locked";
-  const videoTag = !t.video_required
-    ? <span className="tag">{rules.video_from_day}-kundan</span>
-    : t.video === "reviewing" ? <span className="tag sun"><Hourglass size={11} /> Tekshirilmoqda</span>
-    : t.video === "rejected" ? <span className="tag bad">Rad etildi</span>
+  const isVideo = t.proof_kind === "video";
+  const proofState = !t.woke ? "locked"
+    : isVideo ? (t.video === "approved" ? "done" : t.video === "rejected" ? "failed" : "active")
+    : t.voice ? "done" : "active";
+  const proofTag = isVideo && t.video === "reviewing" ? <span className="tag sun"><Hourglass size={11} /> Rota tekshirmoqda</span>
+    : isVideo && t.video === "rejected" ? <span className="tag bad">Rad etildi</span>
+    : !t.proof_done ? <span className="tag num">{t.proof_deadline} gacha</span>
     : null;
 
   return (
     <ol className="chain card">
       <Link
         icon={Sun} state={t.woke ? "done" : "active"} title="Uyg'ondim"
-        hint={t.woke ? "Ajoyib, birinchi qadam bosildi." : `Budilnikdan keyin ${rules.grace_minutes} daqiqa ichida bosing`}
+        hint={t.woke ? "Birinchi qadam bosildi. Endi buyruqni bajaring." : `Budilnikdan keyin ${rules.grace_minutes} daqiqa ichida — botdagi tugma yoki shu yerda`}
       />
       <Link
-        icon={Mic} state={t.voice ? "done" : t.woke ? "active" : "locked"} title="Guruhga ovozli xabar"
-        hint="Bot yuborgan gapni ovoz chiqarib o'qing va qabila guruhiga voice tashlang"
-      />
-      <Link
-        icon={Video} state={videoState} title="10 soniyalik video" tag={videoTag}
+        icon={isVideo ? Video : Mic} state={proofState} tag={proofTag}
+        title={isVideo ? "Video raport — tashqarida" : "Ovozli raport"}
         hint={
-          !t.video_required
-            ? `Hozircha faqat vaqtida turish va ovoz. Video ${rules.video_from_day}-kundan talab qilinadi.`
-            : "Tashqariga chiqing, suv iching va video krujokni botga yuboring. 3 kishidan 2 tasi tasdiqlashi kerak."
+          isVideo
+            ? "Tashqariga chiqing, suv iching. Yurib turib gapni o'qigan holda video krujok yozing va botga yuboring. Rotadan 3 kishi tekshiradi."
+            : `Gapni ovoz chiqarib o'qing va budilnikdan keyin ${rules.voice_deadline_minutes} daqiqa ichida ovozli xabarni botga yuboring.` + (rules.video_from_day ? ` Video ${rules.video_from_day}-kundan boshlanadi.` : "")
         }
       >
-        {t.video_required && gender === "F" && (
+        {isVideo && gender === "F" && (
           <div className="quote" style={{ fontStyle: "normal" }}>
-            Yuzingizni ko'rsatish shart emas — ko'cha yoki oyna tomonga suratga oling, ovozingiz eshitilsin.
+            Yuzingizni ko'rsatish shart emas — orqa kamerani yoqing, ovozingiz eshitilsin.
           </div>
         )}
       </Link>
@@ -163,26 +173,147 @@ function Chain({ t, gender, rules }) {
   );
 }
 
+function OrderCard({ t }) {
+  return (
+    <div className="card order">
+      <div className="order-head">
+        <Megaphone size={16} /> BUYRUQ №{t.day_number}
+      </div>
+      <p className="muted small" style={{ margin: "8px 0 6px" }}>Ovoz chiqarib o'qing:</p>
+      <div className="order-phrase">«{t.phrase}»</div>
+      <div className="order-foot">
+        <span><Send size={14} /> Raportni <b>botga</b> yuboring</span>
+        <span className="num"><Clock size={14} /> {t.proof_deadline} gacha</span>
+      </div>
+    </div>
+  );
+}
+
+const ROLL = {
+  done: { icon: CheckCircle2, color: "var(--ok)", label: "Safda" },
+  woke: { icon: Hourglass, color: "var(--sun)", label: "Turdi, raport yo'q" },
+  absent: { icon: XCircle, color: "var(--bad)", label: "Javob yo'q" },
+  frozen: { icon: Snowflake, color: "var(--ice)", label: "Muzlatilgan" },
+  rest: { icon: BedDouble, color: "var(--rest)", label: "Yakshanba" },
+  out: { icon: Ban, color: "var(--muted)", label: "Chiqarilgan" },
+};
+
+function SquadRoll() {
+  const { data } = useLoad(api.squad);
+  if (!data) return null;
+  const pct = data.total ? (data.done / data.total) * 100 : 0;
+  return (
+    <>
+      <div className="section-title">{data.squad} · bugungi raport</div>
+      <div className="card">
+        <div className="row-between">
+          <span className="muted small"><Users size={14} style={{ verticalAlign: -2 }} /> Safda</span>
+          <b className="num">{data.done}/{data.total}</b>
+        </div>
+        <div className="progress"><i style={{ width: `${Math.max(pct, 2)}%`, background: "linear-gradient(90deg, #4fd28f, var(--ok))" }} /></div>
+        <ul className="roll">
+          {data.members.map((m, i) => {
+            const s = ROLL[m.status];
+            return (
+              <li key={i} className={m.status === "out" ? "out" : ""}>
+                <Avatar name={m.name} />
+                <span className="name">{m.name}{m.me && <span className="tag" style={{ marginLeft: 6 }}>siz</span>}</span>
+                {m.strikes > 0 && m.status !== "out" && (
+                  <span className="strikes" title={`${m.strikes} ta ogohlantirish`}>
+                    {Array.from({ length: m.strikes }, (_, k) => <i key={k} />)}
+                  </span>
+                )}
+                <s.icon size={18} color={s.color} aria-label={s.label} />
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </>
+  );
+}
+
 const DAY_BANNERS = {
   completed: { tone: "ok", icon: CheckCircle2, title: "Bugungi kun bajarildi", text: "Sen zo'r ketyapsan. Ertaga ham shunday!" },
-  frozen: { tone: "ice", icon: Snowflake, title: "Bugun muzlatilgan kun", text: "Dam oling va tezroq tuzaling. Strike berilmaydi." },
-  rest: { tone: "rest", icon: BedDouble, title: "Yakshanba — dam olish", text: "Strike yo'q. Barvaqt turganlar Joker oladi." },
+  frozen: { tone: "ice", icon: Snowflake, title: "Bugun muzlatilgan kun", text: "Dam oling va tezroq tuzaling. Ogohlantirish berilmaydi." },
+  rest: { tone: "rest", icon: BedDouble, title: "Yakshanba — dam olish", text: "Ogohlantirish yo'q. Barvaqt turganlar Immunitet oladi." },
   failed: { tone: "bad", icon: XCircle, title: "Bugun bajarilmadi", text: "Sen o'zgaraman deb kelganding. Ertaga isbotla." },
 };
 
 function NoMembership({ status }) {
   if (status === "pending") {
-    return <Empty icon={Clock} title="Anketangiz ko'rib chiqilmoqda" text="Admin tasdiqlagach, botda /join orqali oqimga qo'shilasiz." />;
+    return <Empty icon={Clock} title="Arizangiz ko'rib chiqilmoqda" text="Tasdiqlangach, rotangiz va start sanasi shu yerda chiqadi." />;
   }
-  return <Empty icon={Sunrise} title="Siz hozir faol oqimda emassiz" text="Botda /join buyrug'i orqali yangi oqimga qo'shiling." />;
+  return <Empty icon={Sunrise} title="Siz hozir faol oqimda emassiz" text="Botda /join buyrug'i orqali yangi oqimdagi rotani tanlang." />;
+}
+
+const GUIDE = [
+  { icon: AlarmClock, title: "Bot uyg'otadi", text: (u) => `Budilnik ${u.alarm} da «TURISH!» xabari keladi.` },
+  { icon: Sun, title: "«Uyg'ondim» tugmasi", text: (u) => `Xabar ostidagi tugmani ${u.rules.wake_grace} daqiqa ichida bosing.` },
+  { icon: Mic, title: "Ovozli raport", text: (u) => `Bot bergan gapni ${u.rules.voice_deadline} daqiqa ichida botga ovozli xabar qilib yuboring: 🎙 tugmasini bosib turing, o'qing, qo'yib yuboring.` },
+  { icon: CheckCircle2, title: "Tamom", text: () => "Bot «Raport qabul qilindi» deydi va rotangizga e'lon qiladi." },
+];
+
+/** Qabul qilingan, lekin oqim hali boshlanmagan: sanoq, rota, yo'riqnoma. */
+function Upcoming({ u, me }) {
+  return (
+    <div>
+      <section className="hero">
+        <div className="hero-top">
+          <span><b>{u.squad}</b> · {u.tribe}</span>
+          <span className="chip"><Timer size={14} />Start {u.start_date}</span>
+        </div>
+        <div className="hero-main">
+          <div className="ring" aria-label={`Startga ${u.days_left} kun`}>
+            <div className="ring-label" style={{ position: "static", height: 96, width: 96, borderRadius: "50%", border: "7px solid rgb(255 255 255 / 16%)" }}>
+              <b className="num">{u.days_left}</b><span>kun qoldi</span>
+            </div>
+          </div>
+          <div>
+            <div className="hero-alarm-label"><AlarmClock size={15} />Birinchi budilnik</div>
+            <div className="hero-alarm num">{u.alarm}</div>
+            <div className="hero-sub">Maqsad <b className="num">{u.target}</b> · {u.cohort}</div>
+          </div>
+        </div>
+      </section>
+      <div className="section-title">Har tong nima qilasiz</div>
+      <ol className="chain card">
+        {GUIDE.map((g, i) => (
+          <li key={i} className="link active">
+            <div className="link-icon"><g.icon size={20} /></div>
+            <div className="link-body"><div className="link-title">{i + 1}. {g.title}</div><div className="link-hint">{g.text(u)}</div></div>
+          </li>
+        ))}
+      </ol>
+      <div className="banner rest" style={{ marginTop: 12 }}>
+        <div className="banner-icon"><Mic size={22} /></div>
+        <div><b>Hozir mashq qiling</b><small className="muted">Botga istalgan ovozli xabar yuboring — bot «Mashq qabul qilindi» deydi.</small></div>
+      </div>
+      <div className="banner ok" style={{ marginTop: 10 }}>
+        <div className="banner-icon"><Users size={22} /></div>
+        <div><b>Yolg'iz bo'lma</b><small className="muted">Do'stingizni ham chaqiring — birga erta turish osonroq.</small></div>
+      </div>
+      {me.awards?.length > 0 && <div className="section-title">Mukofotlaringiz «Yo'l» bo'limida</div>}
+    </div>
+  );
 }
 
 export default function Today({ me, error, reload }) {
   const [askFreeze, setAskFreeze] = useState(false);
+  const [ritual, setRitual] = useState(false);
   const [run, busy] = useAction(reload);
+
+  const doWake = () => {
+    setRitual(true);
+    haptic("success");
+    sound.wake();
+    run(api.wake);
+    setTimeout(() => setRitual(false), 1900);
+  };
 
   if (error && !me) return <ErrorCard text={error} />;
   if (!me) return <div className="stack"><Skeleton height={190} /><Skeleton height={86} /><Skeleton height={230} /></div>;
+  if (me.upcoming) return <Upcoming u={me.upcoming} me={me} />;
   if (!me.membership || !me.journey) return <NoMembership status={me.status} />;
 
   const t = me.today;
@@ -191,6 +322,7 @@ export default function Today({ me, error, reload }) {
 
   return (
     <div>
+      {ritual && <WakeRitual />}
       <Hero me={me} />
       <Stats me={me} />
 
@@ -205,12 +337,13 @@ export default function Today({ me, error, reload }) {
           {isSunday && (
             <div className="banner rest">
               <div className="banner-icon"><BedDouble size={22} /></div>
-              <div><b>Yakshanba</b><small className="muted">Uxlash mumkin. Lekin hammasini bajarsangiz — 1 ta Joker.</small></div>
+              <div><b>Yakshanba</b><small className="muted">Uxlash mumkin. Lekin hammasini bajarsangiz — 1 ta Immunitet.</small></div>
             </div>
           )}
+          {t.woke && !t.proof_done && t.phrase && <OrderCard t={t} />}
           <Chain t={t} gender={me.gender} rules={me.journey.rules} />
           {!t.woke && (
-            <button className="btn btn-primary btn-xl btn-block" disabled={busy} onClick={() => run(api.wake, "Xayrli tong! Endi ovozli xabar.")}>
+            <button className="btn btn-primary btn-xl btn-block wake-btn" disabled={busy} onClick={doWake}>
               <Sun size={22} /> Uyg'ondim
             </button>
           )}
@@ -219,10 +352,12 @@ export default function Today({ me, error, reload }) {
         <Empty icon={Sunrise} title="Bugun oqim kuni emas" />
       )}
 
+      <SquadRoll key={t?.status + String(t?.woke)} />
+
       <div className="section-title">Chat oynalari</div>
       <Windows windows={me.journey.windows} />
 
-      {!me.membership.freeze_used && (
+      {me.membership.freezes_left > 0 && (
         <button className="btn btn-ghost btn-block" style={{ marginTop: 18 }} onClick={() => setAskFreeze(true)}>
           <Snowflake size={17} /> Ertangi kunni muzlatish
         </button>
@@ -230,7 +365,7 @@ export default function Today({ me, error, reload }) {
       {askFreeze && (
         <Sheet
           icon={Snowflake} tone="var(--ice)" title="Ertangi kunni muzlatasizmi?"
-          text="Kasal bo'lsangiz — ertangi kun uchun Strike berilmaydi. Bu imkoniyat butun oqimda faqat 1 marta va faqat kechqurun ishlaydi."
+          text={`Kasal bo'lsangiz — ertangi kun uchun ogohlantirish berilmaydi. Qolgan imkoniyat: ${me.membership.freezes_left} ta, faqat kechqurun ishlaydi.`}
           confirm="Muzlatish"
           onConfirm={() => run(() => api.freeze(""), "Ertangi kun muzlatildi. Tuzalib keting!")}
           onClose={() => setAskFreeze(false)}

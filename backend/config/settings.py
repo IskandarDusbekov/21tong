@@ -23,7 +23,7 @@ ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0
 CSRF_TRUSTED_ORIGINS = [o for o in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o]
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    "config.admin.TongAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.camp",
     "apps.proofs",
     "apps.community",
+    "apps.control",
 ]
 
 MIDDLEWARE = [
@@ -51,7 +52,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -121,8 +122,10 @@ TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
 DEV_LOGIN = DEBUG and env_bool("DEV_LOGIN", True)
 # `npm run build` natijasi — DEV_LOGIN yoqilgan bo'lsa runserver uni "/" da ko'rsatadi
 MINIAPP_DIST = BASE_DIR.parent / "miniapp" / "dist"
-# Manifest rasmi uchun TTF shrift (bo'sh bo'lsa Pillow standart shrifti)
-MANIFEST_FONT_PATH = os.getenv("MANIFEST_FONT_PATH", "")
+# Boshqaruv paneli build'i (`panel/` da `npm run build`) — DEBUG da http://localhost:8000/panel/
+PANEL_DIST = BASE_DIR.parent / "panel" / "dist"
+# Mukofot va taklif rasmlari uchun TTF shriftlar papkasi (bo'sh bo'lsa tizim shriftlari qidiriladi)
+MANIFEST_FONT_DIR = os.getenv("MANIFEST_FONT_DIR", "")
 # Bot -> backend so'rovlari uchun umumiy maxfiy kalit (X-Bot-Secret sarlavhasi)
 BOT_API_SECRET = os.getenv("BOT_API_SECRET", "dev-bot-secret")
 # Mini App initData amal qilish muddati (soniya)

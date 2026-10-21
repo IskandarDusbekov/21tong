@@ -1,4 +1,7 @@
-"""3-bo'lim: anti-uyqu zanjirining 2- va 3-qadamlari hamda P2P ovoz berish."""
+"""
+Tonggi zanjir: "Uyg'ondim" -> BUYRUQ (o'qiladigan gap) -> raport botga (ovoz yoki video krujok).
+Raport backend'ga yoziladi va Mini App ichidagi rota chatida paydo bo'ladi — rotadoshlar eshitadi/ko'radi.
+"""
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
@@ -8,27 +11,44 @@ from api import ApiError, backend
 router = Router()
 
 
-@router.message(F.chat.type.in_({"group", "supergroup"}), F.voice)
-async def group_voice(message: Message):
-    """2-qadam: qabila guruhidagi ovozli xabar."""
+@router.callback_query(F.data == "wake")
+async def wake(call: CallbackQuery):
     try:
-        await backend.voice(message.from_user.id, message.chat.id)
+        p = await backend.wake(call.from_user.id)
     except ApiError as e:
-        if e.status != 404:
-            await message.reply(str(e.detail))
-        return
-    await message.reply(texts.VOICE_OK)
+        return await call.answer(str(e.detail), show_alert=True)
+    user = await backend.get_user(call.from_user.id)
+    await call.message.edit_reply_markup(reply_markup=None)
+    await call.answer("Xayrli tong! Buyruqni o'qing.")
+    await call.message.answer(texts.order(p, user and user.get("gender")))
+
+
+@router.message(F.chat.type == "private", F.voice)
+async def voice(message: Message):
+    try:
+        p = await backend.voice(message.from_user.id, message.voice.file_id)
+    except ApiError as e:
+        if e.status == 404:
+            return await message.answer(texts.t("not_registered"))
+        return await message.answer(f"⛔ {e.detail}")
+    if p.get("practice"):
+        return await message.answer(texts.practice(p))
+    await message.answer(texts.t("voice_ok", day=p["day_number"]))
 
 
 @router.message(F.chat.type == "private", F.video_note | F.video)
-async def private_video(message: Message):
-    """3-qadam: 10 soniyalik video krujok (yoki oddiy qisqa video)."""
+async def video(message: Message):
     media = message.video_note or message.video
     try:
-        result = await backend.video(message.from_user.id, media.file_id, media.duration or 0)
+        p = await backend.video(message.from_user.id, media.file_id, media.duration or 0)
     except ApiError as e:
-        return await message.answer(str(e.detail))
-    await message.answer(texts.VIDEO_SENT if result["status"] == "reviewing" else texts.VIDEO_AUTO)
+        return await message.answer(f"⛔ {e.detail}")
+    await message.answer(texts.t("video_sent") if p["proof_status"] == "reviewing" else texts.t("voice_ok", day=p["day_number"]))
+
+
+@router.message(F.chat.type == "private", F.audio | F.photo | F.document)
+async def wrong_media(message: Message):
+    await message.answer(texts.t("unknown_media"))
 
 
 @router.callback_query(F.data.startswith("vote:"))
@@ -38,5 +58,6 @@ async def vote(call: CallbackQuery):
         await backend.vote(int(review_id), call.from_user.id, approved == "1")
     except ApiError as e:
         return await call.answer(str(e.detail), show_alert=True)
-    await call.message.edit_reply_markup(reply_markup=None)
-    await call.answer(texts.VOTE_THANKS)
+    verdict = "✅ Siz tasdiqladingiz" if approved == "1" else "❌ Siz rad etdingiz"
+    await call.message.edit_text(f"{call.message.html_text}\n\n<b>{verdict}</b>", reply_markup=None)
+    await call.answer(texts.t("vote_thanks"))

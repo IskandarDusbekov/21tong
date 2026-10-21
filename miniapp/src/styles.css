@@ -173,6 +173,25 @@ button:disabled { cursor: default; }
   font-size: 14px; font-style: italic; border-left: 3px solid var(--sun);
 }
 
+/* ---------- Buyruq kartasi ---------- */
+.order { border: 1.5px solid color-mix(in srgb, var(--sun) 45%, transparent); background: linear-gradient(180deg, var(--sun-soft), transparent 70%), var(--surface); }
+.order-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.1em; color: var(--sun); }
+.order-phrase { font-size: 19px; font-weight: 700; line-height: 1.35; letter-spacing: -0.01em; }
+.order-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.order-foot span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---------- Rota raporti ---------- */
+.row-between { display: flex; justify-content: space-between; align-items: center; }
+.roll { list-style: none; margin: 12px 0 0; padding: 0; }
+.roll li { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.roll li + li { border-top: 1px solid var(--line); }
+.roll .avatar { width: 30px; height: 30px; font-size: 13px; }
+.roll .name { flex: 1; min-width: 0; font-weight: 500; }
+.roll li.out { opacity: .45; }
+.roll li.out .name { text-decoration: line-through; }
+.strikes { display: inline-flex; gap: 3px; }
+.strikes i { width: 7px; height: 7px; border-radius: 2px; background: var(--bad); }
+
 .banner { display: flex; gap: 12px; align-items: center; padding: 16px; border-radius: var(--radius); }
 .banner-icon { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; flex: none; }
 .banner.ok { background: var(--ok-soft); } .banner.ok .banner-icon { background: var(--ok); color: #fff; }
@@ -220,6 +239,12 @@ button:disabled { cursor: default; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 14px; font-size: 12px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 10px; height: 10px; border-radius: 3px; }
+
+.awards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.award { display: block; background: var(--surface); border-radius: var(--radius); padding: 8px 8px 10px; box-shadow: var(--shadow); text-decoration: none; color: var(--text); }
+.award img { display: block; width: 100%; height: auto; border-radius: 12px; margin-bottom: 8px; }
+.award b { display: block; font-size: 14px; padding: 0 4px; }
+.award small { display: block; padding: 0 4px; }
 
 .kaizen svg { display: block; width: 100%; height: auto; overflow: visible; }
 
@@ -321,6 +346,189 @@ button:disabled { cursor: default; }
 
 .empty { text-align: center; padding: 32px 16px; color: var(--muted); }
 .empty-icon { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; margin: 0 auto 12px; background: var(--surface-2); }
+
+.tag.info { background: var(--ice-soft); color: var(--ice); }
+
+/* --- Rota chati ------------------------------------------------------------ */
+.chat { display: flex; flex-direction: column; }
+.chat-window {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow);
+  border: 1.5px solid var(--line); margin-bottom: 10px;
+}
+.chat-window.open { border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: linear-gradient(180deg, var(--ok-soft), transparent 80%), var(--surface); }
+.chat-window.closed { border-color: var(--line); }
+.chat-window-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.chat-window-main b { display: block; font-size: 14px; }
+.chat-window-main small { display: flex; align-items: center; gap: 4px; }
+.chat-window.open .chat-window-main > svg { color: var(--ok); }
+.chat-roll { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 13px; color: var(--muted); flex: none; }
+
+.chat-list {
+  display: flex; flex-direction: column; gap: 10px;
+  max-height: 58vh; overflow-y: auto; padding: 4px 2px; scroll-behavior: smooth;
+}
+.chat-list > * { animation: chatIn .28s ease both; }
+@keyframes chatIn { from { opacity: 0; transform: translateY(8px); } }
+
+.chat-report { background: var(--surface); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); border-left: 3px solid var(--line); }
+.chat-report.tone-ok { border-left-color: var(--ok); }
+.chat-report.tone-bad { border-left-color: var(--bad); }
+.chat-report.tone-sun { border-left-color: var(--sun); }
+.chat-report.me { background: var(--sun-soft); }
+.chat-report-head { display: flex; align-items: center; gap: 10px; }
+.chat-report-who { flex: 1; min-width: 0; }
+.chat-report-who b { font-size: 14px; }
+.chat-report-who small { display: flex; align-items: center; gap: 4px; }
+.chat-time { flex: none; }
+.chat-phrase {
+  margin: 8px 0; padding: 8px 10px; border-radius: 10px; background: var(--surface-2);
+  font-size: 13px; font-style: italic; color: var(--text);
+}
+.chat-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chat-badges .tag { display: inline-flex; align-items: center; gap: 3px; }
+
+.play-btn {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 14px;
+  border-radius: 999px; border: 0; cursor: pointer; font-weight: 700; font-size: 13px;
+  background: linear-gradient(135deg, var(--sun-2), var(--sun)); color: #fff;
+}
+.play-btn:disabled { opacity: .6; }
+.chat-audio { width: 100%; margin-top: 8px; height: 40px; }
+.chat-media { width: 100%; margin-top: 8px; border-radius: 12px; max-height: 320px; background: #000; }
+
+.chat-bubble { display: flex; gap: 8px; align-items: flex-end; max-width: 86%; }
+.chat-bubble.me { margin-left: auto; flex-direction: row-reverse; }
+.chat-bubble-body { background: var(--surface); border-radius: 14px; padding: 8px 12px; box-shadow: var(--shadow); }
+.chat-bubble.me .chat-bubble-body { background: linear-gradient(135deg, var(--sun-2), var(--sun)); color: #fff; }
+.chat-bubble-author { font-size: 12px; color: var(--sun); display: block; margin-bottom: 2px; }
+.chat-bubble-body p { margin: 0; font-size: 14px; word-break: break-word; }
+.chat-bubble-time { font-size: 10px; opacity: .7; display: block; text-align: right; margin-top: 2px; }
+
+.chat-system {
+  display: flex; align-items: center; gap: 8px; align-self: center; max-width: 92%;
+  padding: 7px 12px; border-radius: 999px; font-size: 13px; background: var(--surface-2);
+}
+.chat-system.bad { color: var(--bad); background: var(--bad-soft); }
+.chat-system.ok { color: var(--ok); background: var(--ok-soft); }
+.chat-system small { margin-left: auto; opacity: .8; }
+
+.chat-composer { display: flex; gap: 8px; margin-top: 12px; }
+.chat-composer input {
+  flex: 1; min-width: 0; padding: 12px 14px; border-radius: 999px; border: 1.5px solid var(--line);
+  background: var(--surface); color: var(--text); font-size: 15px; outline: none;
+}
+.chat-composer input:focus { border-color: var(--sun); }
+.chat-composer.locked { align-items: center; gap: 8px; color: var(--muted); padding: 12px 14px; border-radius: 14px; background: var(--surface-2); }
+.chat-send { flex: none; width: 48px; padding: 0; display: grid; place-items: center; }
+.chat-hint { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 10px; padding: 0 4px; }
+
+/* --- Kechki refleksiya (chat ichida) --------------------------------------- */
+.chat-reflection {
+  background: linear-gradient(180deg, var(--rest-soft), transparent 90%), var(--surface);
+  border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); border-left: 3px solid var(--rest);
+}
+.chat-reflection-head { display: flex; align-items: center; gap: 8px; color: var(--rest); }
+.chat-reflection-head b { color: var(--text); font-size: 14px; }
+.chat-reflection-head .chat-time { margin-left: auto; }
+.chat-reflection p { margin: 8px 0; font-size: 14px; }
+.reflection-prompt { margin-top: 12px; padding: 14px; }
+.reflection-prompt-head { display: flex; align-items: center; gap: 8px; color: var(--rest); margin-bottom: 8px; }
+.reflection-prompt textarea {
+  width: 100%; min-height: 64px; resize: vertical; border: 1.5px solid var(--line); border-radius: 12px;
+  padding: 10px 12px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px; outline: none;
+}
+.reflection-prompt textarea:focus { border-color: var(--rest); }
+
+/* --- Sub-tablar (Reyting) -------------------------------------------------- */
+.seg { display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 999px; margin-bottom: 14px; }
+.seg button {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 9px 6px; border: 0; border-radius: 999px; background: transparent; color: var(--muted);
+  font-weight: 700; font-size: 13px; cursor: pointer; transition: background .2s, color .2s;
+}
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.btn-sm { padding: 7px 12px; font-size: 13px; }
+
+.rank-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.rank-main .name { flex: none; }
+.rank-sub { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.rank-sub .num { display: inline-flex; align-items: center; gap: 2px; }
+.rank-list .points { font-size: 16px; color: var(--sun); flex: none; }
+.squad-badge { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--sun-soft); color: var(--sun); flex: none; }
+
+/* --- Tonggi rasm chelenji -------------------------------------------------- */
+.challenge { margin-bottom: 18px; }
+.challenge-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.challenge-head b { display: flex; align-items: center; gap: 5px; font-size: 15px; }
+.challenge-head small { display: block; }
+.photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.photo-card { background: var(--surface); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); }
+.photo-card.lead { outline: 2px solid var(--sun); }
+.photo-img { position: relative; aspect-ratio: 1; background: var(--surface-2); }
+.photo-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-rank {
+  position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #fff;
+}
+.photo-rank.ghost { background: rgb(0 0 0 / 55%); }
+.photo-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 10px; }
+.photo-author { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
+.photo-author .avatar { flex: none; }
+.vote-btn {
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px;
+  border: 1.5px solid var(--line); background: var(--surface); color: var(--muted); font-weight: 700; cursor: pointer;
+}
+.vote-btn.on { color: var(--sun); border-color: var(--sun); background: var(--sun-soft); }
+.vote-btn:disabled { opacity: .55; }
+
+/* --- Ovozsiz rejim tugmasi ------------------------------------------------- */
+.sound-toggle {
+  position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); right: 10px; z-index: 60;
+  width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer;
+  display: grid; place-items: center; color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(6px);
+  box-shadow: var(--shadow);
+}
+.sound-toggle:hover { color: var(--text); }
+
+/* --- "Uyg'ondim" marosimi -------------------------------------------------- */
+.wake-btn { animation: wakePulse 2s ease-in-out infinite; }
+@keyframes wakePulse {
+  0%, 100% { box-shadow: 0 6px 18px color-mix(in srgb, var(--sun) 35%, transparent); }
+  50% { box-shadow: 0 6px 30px color-mix(in srgb, var(--sun) 65%, transparent); }
+}
+.ritual {
+  position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px; text-align: center; color: #fff;
+  background: radial-gradient(120% 90% at 50% 45%, #ff9a3d 0%, #ff7a2f 35%, #c2410c 75%, #7c2d12 100%);
+  animation: ritualIn .35s ease both, ritualOut .5s ease 1.4s both;
+}
+@keyframes ritualIn { from { opacity: 0; } }
+@keyframes ritualOut { to { opacity: 0; } }
+.ritual-sun { position: relative; display: grid; place-items: center; color: #fff; animation: ritualRise .9s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes ritualRise { from { transform: translateY(40px) scale(.6); opacity: 0; } }
+.ritual-rays {
+  position: absolute; width: 60px; height: 60px; border-radius: 50%;
+  box-shadow: 0 0 0 0 rgb(255 255 255 / 55%); animation: ritualRays 1.3s ease-out .3s infinite;
+}
+@keyframes ritualRays {
+  to { box-shadow: 0 0 0 90px rgb(255 255 255 / 0%); }
+}
+.ritual-text { font-size: 22px; margin-top: 12px; animation: ritualRise 1s cubic-bezier(.2,.8,.2,1) .15s both; }
+.ritual small { opacity: .9; animation: ritualRise 1s cubic-bezier(.2,.8,.2,1) .3s both; }
+
+/* --- Yo'l: bosqichlar jonli ochiladi --------------------------------------- */
+.stages .stage { animation: stageIn .4s ease both; }
+.stages .stage:nth-child(2) { animation-delay: .06s; }
+.stages .stage:nth-child(3) { animation-delay: .12s; }
+.stages .stage:nth-child(4) { animation-delay: .18s; }
+@keyframes stageIn { from { opacity: 0; transform: translateX(-10px); } }
+.stage.next .stage-badge { animation: nextGlow 1.8s ease-in-out infinite; }
+@keyframes nextGlow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sun) 40%, transparent); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--sun) 0%, transparent); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

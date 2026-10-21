@@ -2,10 +2,12 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Sum
 
 from apps.camp import rules
-from apps.camp.models import Membership
-from apps.camp.services import RuleError, local_now
+from apps.camp.models import Award, DayRecord, Membership, Strike
+from apps.camp.services import RuleError, day_progress, local_now, squad_report
 
-from .models import Bounty, BountyCompletion, CoinTransaction, Fire, Reflection
+from .models import (
+    Bounty, BountyCompletion, CoinTransaction, Fire, PhotoChallenge, PhotoEntry, PhotoVote, Reflection, SquadMessage,
+)
 
 
 def add_reflection(membership, text, now=None):
@@ -14,8 +16,9 @@ def add_reflection(membership, text, now=None):
     text = (text or "").strip()
     if not text:
         raise RuleError("Javob bo'sh bo'lmasin.")
-    if len(text) > rules.REFLECTION_MAX_LENGTH:
-        raise RuleError(f"Maksimal {rules.REFLECTION_MAX_LENGTH} belgi.")
+    limit = rules.current().reflection_max_length
+    if len(text) > limit:
+        raise RuleError(f"Maksimal {limit} belgi.")
     cohort = membership.cohort
     if not rules.in_window(now, cohort.evening_window_start, cohort.evening_window_end):
         raise RuleError(f"Kechki oyna {cohort.evening_window_start:%H:%M}–{cohort.evening_window_end:%H:%M} da ochiq.")
@@ -27,14 +30,17 @@ def add_reflection(membership, text, now=None):
     return reflection
 
 
+def _visible(membership):
+    """Lenta faqat o'z rotasi ichida (rota bo'lmasa — o'z oqimi va jinsi)."""
+    if membership.squad_id:
+        return Q(membership__squad=membership.squad_id)
+    return Q(membership__cohort=membership.cohort, membership__tribe__gender=membership.tribe.gender)
+
+
 def feed(membership, date):
-    """Lenta: faqat o'z oqimi va o'z jinsidagilarning refleksiyalari."""
+    """Lenta: rotadoshlarning bugungi refleksiyalari."""
     return (
-        Reflection.objects.filter(
-            membership__cohort=membership.cohort,
-            membership__tribe__gender=membership.tribe.gender,
-            date=date,
-        )
+        Reflection.objects.filter(_visible(membership), date=date)
         .select_related("membership__user")
         .annotate(
             fire_count=Count("fires"),
@@ -44,10 +50,9 @@ def feed(membership, date):
 
 
 def give_fire(membership, reflection: Reflection):
-    r = reflection.membership
-    if r.cohort_id != membership.cohort_id or r.tribe.gender != membership.tribe.gender:
+    if not Reflection.objects.filter(_visible(membership), pk=reflection.pk).exists():
         raise RuleError("Bu refleksiya sizga ko'rinmaydi.")
-    if r.pk == membership.pk:
+    if reflection.membership_id == membership.pk:
         raise RuleError("O'zingizga olov bera olmaysiz.")
     fire, _ = Fire.objects.get_or_create(reflection=reflection, membership=membership)
     return fire
@@ -75,12 +80,255 @@ def coin_balance(user):
     return CoinTransaction.objects.filter(user=user).aggregate(s=Sum("amount"))["s"] or 0
 
 
-def leaderboard(membership, limit=20):
-    """IrodaCoin reytingi — o'z oqimi va jinsi bo'yicha."""
-    return (
+# --- Reyting (ko'p bosqichli) -------------------------------------------------------
+
+POINTS_PER_DAY = 10   # har bajarilgan kun
+POINTS_PER_VOTE = 5   # rasm chelenjida olingan har bir 🔥
+DONE_STATUSES = ["completed", "rest", "frozen"]
+
+
+def _ranked_members(membership):
+    """Qabila (oqim + jins) a'zolari, ball bilan: bajarilgan kun·10 + IrodaCoin + rasm ovozi·5."""
+    members = list(
         Membership.objects.filter(cohort=membership.cohort, tribe__gender=membership.tribe.gender)
         .exclude(status=Membership.Status.EXPELLED)
-        .select_related("user")
-        .annotate(coins=Sum("user__coin_transactions__amount", default=0))
-        .order_by("-coins", "user__id")[:limit]
+        .select_related("user", "squad")
+        .annotate(days_done=Count("days", filter=Q(days__status__in=DONE_STATUSES), distinct=True))
     )
+    uids = [m.user_id for m in members]
+    ids = [m.id for m in members]
+    coins = dict(CoinTransaction.objects.filter(user_id__in=uids).values_list("user_id").annotate(s=Sum("amount")))
+    votes = dict(PhotoVote.objects.filter(entry__membership_id__in=ids).values_list("entry__membership_id").annotate(c=Count("id")))
+    rows = []
+    for m in members:
+        coin = coins.get(m.user_id) or 0
+        vote = votes.get(m.id) or 0
+        rows.append({
+            "id": m.id, "name": m.user.first_name or str(m.user),
+            "squad_id": m.squad_id, "squad": m.squad.name if m.squad_id else "—",
+            "points": m.days_done * POINTS_PER_DAY + coin + vote * POINTS_PER_VOTE,
+            "coins": coin, "votes": vote, "days": m.days_done, "me": m.id == membership.id,
+        })
+    return rows
+
+
+def ranking(membership):
+    """Uch daraja: rota ichidagi shaxslar, rotalar reytingi, qabila eng zo'rlari."""
+    rows = _ranked_members(membership)
+
+    squads = {}
+    for r in rows:
+        if r["squad_id"] is None:
+            continue
+        s = squads.setdefault(r["squad_id"], {"squad_id": r["squad_id"], "squad": r["squad"],
+                                              "points": 0, "members": 0, "me": r["squad_id"] == membership.squad_id})
+        s["points"] += r["points"]
+        s["members"] += 1
+    squad_list = sorted(squads.values(), key=lambda s: -s["points"] / max(s["members"], 1))
+    for i, s in enumerate(squad_list, 1):
+        s["rank"] = i
+        s["avg"] = round(s["points"] / max(s["members"], 1), 1)
+
+    my_squad = sorted([r for r in rows if r["squad_id"] == membership.squad_id], key=lambda r: -r["points"])
+    tribe_top = sorted(rows, key=lambda r: -r["points"])[:20]
+    return {
+        "my_squad_name": membership.squad.name if membership.squad_id else None,
+        "squad": my_squad,
+        "squads": squad_list,
+        "tribe_top": tribe_top,
+    }
+
+
+# --- Tonggi rasm chelenji -----------------------------------------------------------
+
+def todays_challenge(cohort, date):
+    challenge, _ = PhotoChallenge.objects.get_or_create(cohort=cohort, date=date)
+    return challenge
+
+
+def photo_feed(membership, now=None):
+    """Bugungi rasm chelenji: o'z qabilasidagi rasmlar, ovoz bo'yicha tartiblangan."""
+    now = local_now(now)
+    challenge = todays_challenge(membership.cohort, now.date())
+    entries = (
+        PhotoEntry.objects.filter(challenge=challenge, membership__tribe__gender=membership.tribe.gender)
+        .select_related("membership__user")
+        .annotate(nvotes=Count("votes", distinct=True),
+                  mine=Count("votes", filter=Q(votes__voter=membership), distinct=True))
+    )
+    rows = sorted([
+        {
+            "id": e.id, "author": e.membership.user.first_name or "Ishtirokchi",
+            "me": e.membership_id == membership.id, "votes": e.nvotes, "voted_by_me": bool(e.mine),
+        }
+        for e in entries
+    ], key=lambda r: (-r["votes"], r["id"]))
+    for i, r in enumerate(rows):
+        r["rank"] = i + 1
+    my_count = sum(1 for e in entries if e.membership_id == membership.id)
+    return {
+        "title": challenge.title, "theme": challenge.theme, "max": challenge.max_entries,
+        "my_count": my_count, "can_add": my_count < challenge.max_entries, "entries": rows,
+    }
+
+
+def upload_photo(membership, image, now=None):
+    now = local_now(now)
+    if image is None:
+        raise RuleError("Rasm tanlanmadi.")
+    if getattr(image, "size", 0) > 10 * 1024 * 1024:
+        raise RuleError("Rasm juda katta (10 MB gacha).")
+    challenge = todays_challenge(membership.cohort, now.date())
+    count = PhotoEntry.objects.filter(challenge=challenge, membership=membership).count()
+    if count >= challenge.max_entries:
+        raise RuleError(f"Bugun {challenge.max_entries} tagacha rasm yuborish mumkin.")
+    return PhotoEntry.objects.create(challenge=challenge, membership=membership, image=image)
+
+
+def vote_photo(membership, entry):
+    """🔥 ovoz — o'ziga emas, faqat o'z qabilasidagi rasmga. Qayta bosilsa — ovoz olinadi."""
+    if entry.membership_id == membership.id:
+        raise RuleError("O'z rasmingizga ovoz bera olmaysiz.")
+    if entry.membership.tribe.gender != membership.tribe.gender or entry.challenge.cohort_id != membership.cohort_id:
+        raise RuleError("Bu rasm sizga ko'rinmaydi.")
+    existing = PhotoVote.objects.filter(entry=entry, voter=membership).first()
+    if existing:
+        existing.delete()
+        return False
+    try:
+        PhotoVote.objects.create(entry=entry, voter=membership)
+    except IntegrityError:
+        pass
+    return True
+
+
+# --- Rota chati (Mini App ichida) ---------------------------------------------------
+
+def window_state(cohort, now):
+    """Rota chati holati: hozir qaysi oyna ochiq, ochiq bo'lmasa — keyingisi qachon ochiladi."""
+    windows = [
+        ("morning", "Tonggi oyna", cohort.morning_window_start, cohort.morning_window_end),
+        ("evening", "Kechki oyna", cohort.evening_window_start, cohort.evening_window_end),
+    ]
+    t = now.time()
+    for key, label, start, end in windows:
+        if start <= t <= end:
+            return {"open": True, "which": key, "label": label, "closes_at": end.strftime("%H:%M")}
+    upcoming = sorted((start for _, _, start, _ in windows if start > t))
+    if upcoming:
+        nxt, nxt_label = upcoming[0], next(lb for _, lb, s, _ in windows if s == upcoming[0])
+    else:  # bugun ikkala oyna ham o'tdi — ertalabki oyna ertaga
+        nxt, nxt_label = cohort.morning_window_start, "Tonggi oyna"
+    return {"open": False, "which": None, "label": nxt_label, "next_open": nxt.strftime("%H:%M")}
+
+
+def _report_item(record, viewer_id):
+    p = day_progress(record)
+    m = record.membership
+    if p["proof_kind"] == "video":
+        media = {"kind": "video", "id": record.video.id} if getattr(record, "video", None) else None
+        status = {"approved": "peer_approved", "rejected": "peer_rejected"}.get(p["video"], "pending")
+    else:
+        media = {"kind": "voice", "id": record.id} if record.voice_file_id else None
+        status = "late" if p["voice_late"] else "accepted"
+    at = record.voice_at or getattr(getattr(record, "video", None), "uploaded_at", None) or record.woke_at
+    return {
+        "type": "report",
+        "at": at.isoformat() if at else None,
+        "author": m.user.first_name or str(m.user),
+        "me": m.user_id == viewer_id,
+        "kind": p["proof_kind"],
+        "status": status,
+        "late": p["voice_late"],
+        "admin_reviewed": p["admin_reviewed"],
+        "phrase": record.phrase,
+        "day_number": record.day_number,
+        "media": media,
+    }
+
+
+def squad_chat(membership, now=None):
+    """Rota chati lentasi: raportlar, ogohlantirishlar, bosqichlar va matn xabarlari — vaqt tartibida."""
+    now = local_now(now)
+    squad = membership.squad
+    if squad is None:
+        raise RuleError("Siz hali rotaga biriktirilmagansiz.")
+    date = now.date()
+    viewer_id = membership.user_id
+    items = []
+
+    # Chatda faqat haqiqiy raport ko'rinadi (ovoz yoki video). Faqat uyg'onganlar — safda sanaladi, karta emas.
+    for record in (
+        DayRecord.objects.filter(membership__squad=squad, date=date)
+        .filter(Q(voice_at__isnull=False) | Q(video__isnull=False))
+        .select_related("membership__user", "video")
+    ):
+        items.append(_report_item(record, viewer_id))
+
+    for s in (
+        Strike.objects.filter(membership__squad=squad, created_at__date=date, revoked=False,
+                              cancelled_by_immunity=False)
+        .select_related("membership__user")
+    ):
+        name = s.membership.user.first_name or str(s.membership.user)
+        items.append({"type": "strike", "at": s.created_at.isoformat(), "author": name,
+                      "reason": s.get_reason_display()})
+
+    for a in (
+        Award.objects.filter(membership__squad=squad, issued_at__date=date)
+        .select_related("membership__user", "stage")
+    ):
+        name = a.membership.user.first_name or str(a.membership.user)
+        items.append({"type": "award", "at": a.issued_at.isoformat(), "author": name,
+                      "stage": a.stage.name, "day": a.stage.day, "icon": a.stage.icon})
+
+    for msg in (
+        SquadMessage.objects.filter(squad=squad, created_at__date=date).select_related("author__user")
+    ):
+        author = msg.author.user.first_name if msg.author and msg.author.user.first_name else "Ishtirokchi"
+        items.append({"type": "message", "at": msg.created_at.isoformat(), "author": author,
+                      "me": bool(msg.author and msg.author.user_id == viewer_id), "text": msg.text})
+
+    # Kechki refleksiya ham chatda — 🔥 bilan
+    reflections = (
+        Reflection.objects.filter(membership__squad=squad, date=date)
+        .select_related("membership__user")
+        .annotate(fire_count=Count("fires", distinct=True),
+                  mine_fire=Count("fires", filter=Q(fires__membership=membership), distinct=True))
+    )
+    my_reflected = False
+    for r in reflections:
+        mine = r.membership_id == membership.id
+        my_reflected = my_reflected or mine
+        items.append({
+            "type": "reflection", "at": r.created_at.isoformat(), "id": r.id,
+            "author": r.membership.user.first_name or "Ishtirokchi", "me": mine,
+            "text": r.text, "fires": r.fire_count, "fired_by_me": bool(r.mine_fire),
+        })
+
+    items.sort(key=lambda x: x["at"] or "")
+    report = squad_report(squad, date)
+    window = window_state(membership.cohort, now)
+    return {
+        "squad": squad.name,
+        "tribe": str(squad.tribe),
+        "day_number": report["day_number"],
+        "window": window,
+        "roll": {"done": report["done"], "total": report["total"]},
+        "items": items,
+        # Kechki oyna ochiq va bugun refleksiya yozmagan bo'lsa — ilova taklif qiladi
+        "can_reflect": window.get("which") == "evening" and not my_reflected,
+    }
+
+
+def post_chat_message(membership, text, now=None):
+    """Chatga matn yozish — faqat oyna ochiq bo'lganda."""
+    now = local_now(now)
+    text = (text or "").strip()
+    if not text:
+        raise RuleError("Xabar bo'sh bo'lmasin.")
+    if membership.squad_id is None:
+        raise RuleError("Siz hali rotaga biriktirilmagansiz.")
+    if not window_state(membership.cohort, now)["open"]:
+        raise RuleError("Hozir oyna yopiq — faqat kuzatish mumkin. Chat belgilangan vaqtda ochiladi.")
+    return SquadMessage.objects.create(squad_id=membership.squad_id, author=membership, text=text[:1000])

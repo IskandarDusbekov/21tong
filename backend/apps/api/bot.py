@@ -1,4 +1,5 @@
 """Bot -> backend API. Hammasi `X-Bot-Secret` bilan himoyalangan."""
+from django.core.management import call_command
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -8,9 +9,11 @@ from rest_framework.views import APIView
 
 from apps.accounts.auth import IsBot
 from apps.accounts.manifest import render_manifest
-from apps.accounts.models import User
+from apps.accounts.models import Region, User
 from apps.camp import services
-from apps.camp.models import Cohort, DayRecord, Membership, Notification, Tribe
+from apps.camp.awards import render_award
+from apps.camp.models import Award, Cohort, DayRecord, Membership, Notification, WakeSlot
+from apps.control.models import BotMessage, CampSettings
 from apps.proofs import services as proof_services
 from apps.proofs.models import Review
 
@@ -31,26 +34,61 @@ class BotView(APIView):
 
 
 def user_payload(user):
-    membership = user.memberships.select_related("cohort", "tribe").order_by("-joined_at").first()
+    membership = user.memberships.select_related("cohort", "tribe", "squad").order_by("-joined_at").first()
+    upcoming = services.upcoming_membership(user)
     return {
         "telegram_id": user.telegram_id,
+        "name": user.first_name or user.display_name,
+        "full_name": user.display_name,
+        "upcoming": services.placement_payload(upcoming) if upcoming else None,
         "status": user.status,
         "gender": user.gender,
         "goal": user.goal,
         "referral_code": user.referral_code,
-        "jokers": services.jokers_available(user),
+        "immunities": services.immunities_available(user),
         "membership": membership_summary(membership),
     }
 
 
+def proof_payload(membership, record):
+    """Raport qabul qilingach bot uchun javob (bot foydalanuvchiga tasdiq yuboradi)."""
+    return {
+        **services.day_progress(record),
+        "name": membership.user.first_name or str(membership.user),
+        "squad": membership.squad.name if membership.squad_id else None,
+    }
+
+
+class ConfigView(BotView):
+    """Admin paneldagi bot xabarlari va lager sozlamalari — bot ularni keshlab ishlatadi."""
+
+    def get(self, request):
+        c = CampSettings.load()
+        return Response({
+            "settings": {**c.template_vars(), "registration_open": c.registration_open},
+            "messages": dict(BotMessage.objects.values_list("key", "text")),
+            "regions": [{"value": v, "label": label} for v, label in Region.choices],
+        })
+
+
+# --- Ariza va admin -----------------------------------------------------------
+
 class RegisterView(BotView):
     def post(self, request):
         telegram_id, gender, goal = require(request.data, "telegram_id", "gender", "goal")
+        current = request.data.get("current_wake_time")
+        target = request.data.get("target_wake_time")
+        d = request.data
         user = services.register_user(
             telegram_id=int(telegram_id), gender=gender, goal=goal,
-            username=request.data.get("username", ""),
-            first_name=request.data.get("first_name", ""),
-            referral_code=request.data.get("referral_code"),
+            username=d.get("username", ""),
+            first_name=d.get("first_name", ""), last_name=d.get("last_name", ""), region=d.get("region", ""),
+            slot_id=d.get("slot_id"),
+            referral_code=d.get("referral_code"),
+            current_wake_time=parse_time(current, "current_wake_time") if current else None,
+            target_wake_time=parse_time(target, "target_wake_time") if target else None,
+            tg_first_name=d.get("tg_first_name", ""), tg_last_name=d.get("tg_last_name", ""),
+            tg_language=d.get("tg_language", ""), tg_is_premium=bool(d.get("tg_is_premium")),
         )
         return Response(user_payload(user), status=201)
 
@@ -58,6 +96,30 @@ class RegisterView(BotView):
 class UserView(BotView):
     def get(self, request, telegram_id):
         return Response(user_payload(self.get_user(telegram_id)))
+
+
+class ApproveView(BotView):
+    """Admin Telegram'dagi "Qabul" tugmasini bosdi (adminlikni bot tekshiradi)."""
+
+    def post(self, request, telegram_id):
+        user = self.get_user(telegram_id)
+        if not services.approve_user(user):
+            raise exceptions.ValidationError({"detail": f"Ariza allaqachon ko'rib chiqilgan ({user.get_status_display()})."})
+        return Response(user_payload(user))
+
+
+class RejectView(BotView):
+    def post(self, request, telegram_id):
+        user = self.get_user(telegram_id)
+        if not services.reject_user(user):
+            raise exceptions.ValidationError({"detail": f"Ariza allaqachon ko'rib chiqilgan ({user.get_status_display()})."})
+        return Response(user_payload(user))
+
+
+class PendingApplicationsView(BotView):
+    def get(self, request):
+        users = User.objects.filter(status=User.Status.PENDING).order_by("date_joined")[:50]
+        return Response([{"telegram_id": u.telegram_id, **services.application_payload(u)} for u in users])
 
 
 class ManifestView(BotView):
@@ -68,6 +130,14 @@ class ManifestView(BotView):
         return HttpResponse(render_manifest(user), content_type="image/png")
 
 
+class SlotsView(BotView):
+    """Arizada tanlanadigan tayyor rota vaqtlari."""
+
+    def get(self, request):
+        today = services.local_now().date()
+        return Response([services.slot_json(s, today) for s in services.open_slots()])
+
+
 class RecruitingCohortsView(BotView):
     def get(self, request):
         cohorts = Cohort.objects.filter(status=Cohort.Status.RECRUITING).order_by("start_date")
@@ -76,6 +146,11 @@ class RecruitingCohortsView(BotView):
 
 class JoinView(BotView):
     def post(self, request):
+        if request.data.get("slot_id"):
+            telegram_id, slot_id = require(request.data, "telegram_id", "slot_id")
+            slot = get_object_or_404(WakeSlot, pk=slot_id, is_open=True)
+            m = services.join_slot(self.get_user(telegram_id), slot)
+            return Response(services.placement_payload(m), status=201)
         telegram_id, cohort_id, start, target = require(
             request.data, "telegram_id", "cohort_id", "start_wake_time", "target_wake_time"
         )
@@ -88,24 +163,42 @@ class JoinView(BotView):
         return Response(membership_summary(membership), status=201)
 
 
-class VoiceView(BotView):
-    """Bot qabila guruhida voice ko'rganda chaqiradi."""
+# --- Tonggi zanjir --------------------------------------------------------------
+
+class WakeView(BotView):
+    """Budilnik xabaridagi "Uyg'ondim" tugmasi. Javobda bugungi gap va raport turi."""
 
     def post(self, request):
-        telegram_id, chat_id = require(request.data, "telegram_id", "chat_id")
+        (telegram_id,) = require(request.data, "telegram_id")
         membership = self.get_active(telegram_id)
-        if membership.tribe.telegram_chat_id != int(chat_id):
-            raise exceptions.ValidationError({"detail": "Ovozli xabar o'z qabilangiz guruhiga yuborilishi kerak."})
-        record = services.record_voice(membership)
-        return Response(services.day_progress(record))
+        return Response(services.day_progress(services.press_wake(membership)))
+
+
+class VoiceView(BotView):
+    """1–6 kunlar: gap o'qilgan ovozli raport, botga shaxsiy yuborilgan."""
+
+    def post(self, request):
+        telegram_id, file_id = require(request.data, "telegram_id", "file_id")
+        user = self.get_user(telegram_id)
+        membership = services.active_membership(user)
+        if membership is None:
+            # Oqim hali boshlanmagan — mashq raporti (yangi kelganlar qanday yuborishni o'rganadi)
+            if user.status != User.Status.APPROVED:
+                raise exceptions.ValidationError({"detail": "Avval arizangiz qabul qilinishi kerak."})
+            upcoming = services.upcoming_membership(user)
+            return Response({"practice": True, "upcoming": services.placement_payload(upcoming) if upcoming else None})
+        record = services.record_voice(membership, file_id)
+        return Response(proof_payload(membership, record), status=201)
 
 
 class VideoView(BotView):
+    """7-kundan: tashqarida yozilgan video krujok."""
+
     def post(self, request):
         telegram_id, file_id = require(request.data, "telegram_id", "file_id")
         membership = self.get_active(telegram_id)
         proof = proof_services.submit_video(membership, file_id, int(request.data.get("duration") or 0))
-        return Response({"proof_id": proof.id, "status": proof.status}, status=201)
+        return Response({**proof_payload(membership, proof.day), "proof_status": proof.status}, status=201)
 
 
 class VoteView(BotView):
@@ -116,6 +209,8 @@ class VoteView(BotView):
         proof = proof_services.cast_vote(review, voter, bool(approved))
         return Response({"proof_id": proof.id, "status": proof.status})
 
+
+# --- Xabarlar navbati va jadval ------------------------------------------------
 
 class NotificationsView(BotView):
     def get(self, request):
@@ -143,7 +238,7 @@ class AlarmsView(BotView):
         result = []
         for m in Membership.objects.filter(
             status=Membership.Status.ACTIVE, cohort__status=Cohort.Status.RUNNING
-        ).select_related("cohort", "tribe", "user"):
+        ).select_related("cohort", "tribe", "squad", "user"):
             if m.cohort.day_number(today) is None:
                 continue
             record = services.ensure_day_record(m, today)
@@ -152,23 +247,28 @@ class AlarmsView(BotView):
                     "telegram_id": m.user.telegram_id,
                     "day_number": record.day_number,
                     "gender": m.tribe.gender,
+                    "proof_kind": services.proof_kind(record.day_number),
+                    "squad": m.squad.name if m.squad_id else None,
                 })
         return Response(result)
 
 
-class WindowsView(BotView):
-    """Qabila chatlari va ularning ochiq oynalari — bot chatlarni qulflash/ochish uchun."""
+class AwardImageView(BotView):
+    def get(self, request, pk):
+        award = get_object_or_404(Award.objects.select_related("membership__user", "membership__cohort", "stage"), pk=pk)
+        return HttpResponse(render_award(award), content_type="image/png")
+
+
+class CountdownView(BotView):
+    """Startni kutayotganlar — bot har kech "Startga N kun qoldi" yuboradi."""
 
     def get(self, request):
-        tribes = Tribe.objects.filter(
-            cohort__status=Cohort.Status.RUNNING, telegram_chat_id__isnull=False
-        ).select_related("cohort")
-        return Response([
-            {
-                "chat_id": t.telegram_chat_id,
-                "gender": t.gender,
-                "morning": [t.cohort.morning_window_start.strftime("%H:%M"), t.cohort.morning_window_end.strftime("%H:%M")],
-                "evening": [t.cohort.evening_window_start.strftime("%H:%M"), t.cohort.evening_window_end.strftime("%H:%M")],
-            }
-            for t in tribes
-        ])
+        return Response(services.countdown_list())
+
+
+class RunDailyView(BotView):
+    """Kunlik hisob (bot har kecha 00:05 da va ishga tushganda chaqiradi). Idempotent."""
+
+    def post(self, request):
+        call_command("run_daily")
+        return Response({"ok": True})

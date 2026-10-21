@@ -10,5 +10,10 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
 BOT_API_SECRET = os.getenv("BOT_API_SECRET", "dev-bot-secret")
 MINI_APP_URL = os.getenv("MINI_APP_URL", "")
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "0") or 0)
+# Arizalarni tasdiqlaydigan adminlar (Telegram ID, vergul bilan). ID'ni @userinfobot dan bilish mumkin.
+ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split(",") if x}
 TZ = ZoneInfo(os.getenv("TIME_ZONE", "Asia/Tashkent"))
+
+
+def is_admin(user_id: int) -> bool:
+    return user_id in ADMIN_IDS

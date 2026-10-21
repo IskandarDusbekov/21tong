@@ -1,0 +1,16 @@
+[Unit]
+Description=21tong backend (Django/Gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+# O'zgartiring: server foydalanuvchisi va loyiha yo'li
+User=ubuntu
+WorkingDirectory=/home/ubuntu/21tong/backend
+EnvironmentFile=/home/ubuntu/21tong/.env
+ExecStart=/home/ubuntu/21tong/venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 3 --timeout 60
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

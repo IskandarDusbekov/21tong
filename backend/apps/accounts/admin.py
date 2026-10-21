@@ -1,35 +1,70 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.utils.html import format_html
 
 from apps.camp import services
+from apps.camp.models import Immunity
 
 from .models import User
 
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ("__str__", "telegram_id", "gender", "status", "short_goal", "date_joined")
-    list_filter = ("status", "gender", "is_staff")
-    search_fields = ("username", "telegram_username", "telegram_id", "goal")
-    actions = ["approve", "reject"]
-    fieldsets = BaseUserAdmin.fieldsets + (
-        ("21tong", {"fields": (
-            "telegram_id", "telegram_username", "gender", "goal", "status",
-            "referral_code", "referred_by", "referral_joker_granted", "approved_at",
+    list_display = ("__str__", "first_name", "last_name", "region", "gender", "status", "wake_times",
+                    "telegram_link_col", "short_goal", "date_joined")
+    list_filter = ("status", "gender", "region", "telegram_is_premium", "is_staff")
+    search_fields = ("username", "first_name", "last_name", "telegram_username", "telegram_first_name",
+                     "telegram_last_name", "telegram_id", "goal")
+    actions = ["approve", "reject", "give_immunity"]
+    fieldsets = (
+        ("Ariza", {"fields": (
+            "first_name", "last_name", "region", "gender", "goal",
+            "preferred_slot", "current_wake_time", "target_wake_time", "status", "approved_at",
+        )}),
+        ("Telegram ma'lumotlari", {"fields": (
+            "telegram_id", "telegram_username", "telegram_link_col",
+            "telegram_first_name", "telegram_last_name", "telegram_language", "telegram_is_premium",
+            "date_joined", "last_login",
+        )}),
+        ("Taklif", {"fields": ("referral_code", "referred_by", "referral_immunity_granted")}),
+        ("Admin panelga kirish", {"classes": ("collapse",), "fields": (
+            "username", "password", "is_active", "is_staff", "is_superuser", "groups", "user_permissions",
         )}),
     )
-    readonly_fields = ("approved_at",)
+    readonly_fields = ("approved_at", "telegram_id", "telegram_username", "telegram_link_col",
+                       "telegram_first_name", "telegram_last_name", "telegram_language", "telegram_is_premium",
+                       "date_joined", "last_login")
+    raw_id_fields = ("referred_by",)
+
+    @admin.display(description="Telegram")
+    def telegram_link_col(self, obj):
+        if obj.telegram_link:
+            label = f"@{obj.telegram_username}" if obj.telegram_username else f"ID {obj.telegram_id}"
+            return format_html('<a href="{}" target="_blank">{}</a>', obj.telegram_link, label)
+        return "—"
 
     @admin.display(description="Maqsad")
     def short_goal(self, obj):
         return (obj.goal[:60] + "…") if len(obj.goal) > 60 else obj.goal
 
-    @admin.action(description="Tasdiqlash (yopiq guruhga yo'llanma)")
+    @admin.display(description="Turadi → maqsad")
+    def wake_times(self, obj):
+        if not obj.current_wake_time:
+            return "—"
+        return f"{obj.current_wake_time:%H:%M} → {obj.target_wake_time:%H:%M}" if obj.target_wake_time else f"{obj.current_wake_time:%H:%M}"
+
+    @admin.action(description="Qabul qilish (rotaga joylash)")
     def approve(self, request, queryset):
         n = sum(services.approve_user(u) for u in queryset)
-        self.message_user(request, f"{n} ta foydalanuvchi tasdiqlandi.")
+        self.message_user(request, f"{n} ta ariza qabul qilindi.")
 
     @admin.action(description="Rad etish")
     def reject(self, request, queryset):
         n = sum(services.reject_user(u) for u in queryset)
-        self.message_user(request, f"{n} ta foydalanuvchi rad etildi.")
+        self.message_user(request, f"{n} ta ariza rad etildi.")
+
+    @admin.action(description="Immunitet berish (+1)")
+    def give_immunity(self, request, queryset):
+        for u in queryset:
+            services.grant_immunity(u, Immunity.Source.ADMIN)
+        self.message_user(request, f"{queryset.count()} kishiga Immunitet berildi.")

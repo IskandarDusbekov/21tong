@@ -31,50 +31,80 @@ class Backend:
             raise ApiError(resp.status_code, detail)
         return resp
 
+    async def _json(self, method, url, **kwargs):
+        return (await self._request(method, url, **kwargs)).json()
+
+    async def config(self):
+        return await self._json("GET", "/config/")
+
+    # --- foydalanuvchi va ariza ---
     async def get_user(self, telegram_id):
         try:
-            return (await self._request("GET", f"/users/{telegram_id}/")).json()
+            return await self._json("GET", f"/users/{telegram_id}/")
         except ApiError as e:
             if e.status == 404:
                 return None
             raise
 
     async def register(self, **data):
-        return (await self._request("POST", "/users/register/", json=data)).json()
+        return await self._json("POST", "/users/register/", json=data)
+
+    async def pending(self):
+        return await self._json("GET", "/users/pending/")
+
+    async def approve(self, telegram_id):
+        return await self._json("POST", f"/users/{telegram_id}/approve/")
+
+    async def reject(self, telegram_id):
+        return await self._json("POST", f"/users/{telegram_id}/reject/")
 
     async def manifest(self, telegram_id) -> bytes:
         return (await self._request("GET", f"/users/{telegram_id}/manifest.png")).content
 
     async def recruiting_cohorts(self):
-        return (await self._request("GET", "/cohorts/recruiting/")).json()
+        return await self._json("GET", "/cohorts/recruiting/")
+
+    async def slots(self):
+        return await self._json("GET", "/slots/")
+
+    async def award_image(self, award_id) -> bytes:
+        return (await self._request("GET", f"/awards/{award_id}.png")).content
+
+    async def countdown(self):
+        return await self._json("GET", "/countdown/")
+
+    async def run_daily(self):
+        return await self._json("POST", "/run-daily/")
 
     async def join(self, **data):
-        return (await self._request("POST", "/join/", json=data)).json()
+        return await self._json("POST", "/join/", json=data)
 
-    async def voice(self, telegram_id, chat_id):
-        return (await self._request("POST", "/voice/", json={"telegram_id": telegram_id, "chat_id": chat_id})).json()
+    # --- tonggi zanjir ---
+    async def wake(self, telegram_id):
+        return await self._json("POST", "/wake/", json={"telegram_id": telegram_id})
+
+    async def voice(self, telegram_id, file_id):
+        return await self._json("POST", "/voice/", json={"telegram_id": telegram_id, "file_id": file_id})
 
     async def video(self, telegram_id, file_id, duration):
-        return (await self._request(
+        return await self._json(
             "POST", "/video/", json={"telegram_id": telegram_id, "file_id": file_id, "duration": duration}
-        )).json()
+        )
 
     async def vote(self, review_id, telegram_id, approved):
-        return (await self._request(
+        return await self._json(
             "POST", f"/reviews/{review_id}/vote/", json={"telegram_id": telegram_id, "approved": approved}
-        )).json()
+        )
 
+    # --- navbat va jadval ---
     async def notifications(self):
-        return (await self._request("GET", "/notifications/")).json()
+        return await self._json("GET", "/notifications/")
 
     async def ack(self, ids):
         await self._request("POST", "/notifications/ack/", json={"ids": ids})
 
     async def alarms(self, hhmm):
-        return (await self._request("GET", "/alarms/", params={"time": hhmm})).json()
-
-    async def windows(self):
-        return (await self._request("GET", "/windows/")).json()
+        return await self._json("GET", "/alarms/", params={"time": hhmm})
 
 
 backend = Backend()

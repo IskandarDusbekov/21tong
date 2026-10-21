@@ -1,0 +1,56 @@
+{% extends "admin/index.html" %}
+{% block extrastyle %}{{ block.super }}
+<style>
+  .tong-dash { margin: 0 0 24px; }
+  .tong-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tong-card { display: block; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--hairline-color);
+               background: var(--body-bg); text-decoration: none !important; color: var(--body-fg) !important; }
+  .tong-card:hover { border-color: var(--link-fg); }
+  .tong-card b { display: block; font-size: 26px; line-height: 1.1; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .tong-card span { color: var(--body-quiet-color); font-size: 13px; }
+  .tong-card.warn b { color: #d97706; } .tong-card.ok b { color: #16a34a; } .tong-card.bad b { color: #dc2626; }
+  .tong-box { padding: 14px 16px; border-radius: 10px; border: 1px solid var(--hairline-color); margin-bottom: 12px; }
+  .tong-box h3 { margin: 0 0 8px; font-size: 14px; }
+  .tong-box ul { margin: 0; padding-left: 18px; }
+  .tong-alert { border-color: #f59e0b; background: color-mix(in srgb, #f59e0b 10%, transparent); }
+  .tong-links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tong-links a { padding: 7px 12px; border-radius: 8px; background: var(--darkened-bg); text-decoration: none; font-weight: 600; }
+  .tong-progress { height: 6px; border-radius: 6px; background: var(--darkened-bg); overflow: hidden; margin-top: 6px; }
+  .tong-progress i { display: block; height: 100%; background: #f97316; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if dashboard %}
+<div class="tong-dash">
+  <div class="tong-row">
+    {% for c in dashboard.cards %}
+      <a class="tong-card {{ c.tone }}" href="{{ c.url }}"><b>{{ c.value }}</b><span>{{ c.label }}</span></a>
+    {% endfor %}
+  </div>
+
+  <div class="tong-box">
+    <h3>Oqimlar</h3>
+    {% for c in dashboard.cohorts %}
+      <div style="margin-bottom:10px">
+        <b>{{ c.name }}</b> — {{ c.day|default:"—" }}/{{ c.duration }}-kun · {{ c.members }} faol ishtirokchi
+        <div class="tong-progress"><i style="width: {% widthratio c.day|default:0 c.duration 100 %}%"></i></div>
+      </div>
+    {% empty %}
+      <p>Davom etayotgan oqim yo'q.</p>
+    {% endfor %}
+    {% for c in dashboard.recruiting %}
+      <div>Qabul ochiq: <b>{{ c.name }}</b> · start {{ c.start_date }} · {{ c.n }} kishi yozildi</div>
+    {% endfor %}
+  </div>
+
+  <div class="tong-box">
+    <h3>Tezkor boshqaruv</h3>
+    <div class="tong-links">
+      {% for label, href in dashboard.links %}<a href="{{ href }}">{{ label }}</a>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}

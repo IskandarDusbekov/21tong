@@ -4,6 +4,7 @@ from rest_framework import exceptions
 from rest_framework.views import exception_handler as drf_exception_handler
 from rest_framework.response import Response
 
+from apps.camp import services
 from apps.camp.services import RuleError
 
 
@@ -34,11 +35,10 @@ def membership_summary(membership):
         "id": membership.id,
         "cohort": {"id": membership.cohort_id, "name": membership.cohort.name, "status": membership.cohort.status},
         "tribe": str(membership.tribe),
-        "tribe_chat_id": membership.tribe.telegram_chat_id,
-        "tribe_invite_link": membership.tribe.invite_link,
+        "squad": membership.squad.name if membership.squad_id else None,
         "start_wake_time": membership.tribe.start_wake_time.strftime("%H:%M"),
         "target_wake_time": membership.target_wake_time.strftime("%H:%M"),
         "status": membership.status,
         "strikes": membership.active_strikes,
-        "freeze_used": hasattr(membership, "freeze"),
+        "freezes_left": services.freezes_left(membership),
     }

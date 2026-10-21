@@ -1,50 +1,80 @@
 """
-Lokal ishlab chiqish uchun demo ma'lumot: davom etayotgan oqim, yigitlar va qizlar qabilasi,
-o'tgan kunlar tarixi, bugungi Bounty va refleksiyalar. Mini App'dagi "Dev kirish" orqali
-istalgan demo foydalanuvchi sifatida kirib ko'rish mumkin.
+Lokal ishlab chiqish uchun demo ma'lumot:
+  * davom etayotgan oqim (bugun 8-kun) — yigitlar va qizlar rotalari, tarix, mukofotlar;
+  * 3 kundan keyin boshlanadigan, qabul ochiq oqim — 3 ta tayyor rota vaqti bilan;
+  * startni kutayotgan va tasdiq kutayotgan foydalanuvchilar.
+Mini App'dagi "Dev kirish" orqali istalgan demo foydalanuvchi sifatida kirib ko'rish mumkin.
 
     python manage.py seed_demo          # bir marta yaratadi
     python manage.py seed_demo --reset  # o'chirib, qaytadan yaratadi
 """
 import datetime as dt
+from io import BytesIO
 
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.utils import timezone
+from PIL import Image, ImageDraw
 
 from apps.accounts.models import User
 from apps.camp import services
-from apps.camp.models import Cohort, DayRecord, Joker, Strike
-from apps.community.models import Bounty, BountyCompletion, CoinTransaction, Reflection
+from apps.camp.models import Award, Cohort, DayRecord, Immunity, Membership, Notification, Strike, WakeSlot
+from apps.community.models import (
+    Bounty, BountyCompletion, CoinTransaction, PhotoChallenge, PhotoEntry, PhotoVote, Reflection, SquadMessage,
+)
+from apps.control.models import Stage
 
 COHORT_NAME = "Demo oqim"
-DAYS_PASSED = 7  # bugun 8-kun bo'ladi: budilnik allaqachon surilgan, video talab qilinadi
+NEXT_COHORT_NAME = "Demo: keyingi oqim"
+DAYS_PASSED = 7  # bugun 8-kun bo'ladi: budilnik 3-kundan beri surilmoqda
 
-BOYS = [(1001, "Aziz"), (1002, "Bekzod"), (1003, "Jasur"), (1004, "Sardor")]
-GIRLS = [(2001, "Madina"), (2002, "Nilufar"), (2003, "Zarina")]
-PENDING = [(3001, "Yangi Kelgan")]
+# 9 yigit -> 1-rota (7 kishi) + 2-rota (2 kishi)
+BOYS = [
+    (1001, "Aziz", "Rahimov", "tashkent_city"), (1002, "Bekzod", "Karimov", "samarkand"),
+    (1003, "Jasur", "Tursunov", "fergana"), (1004, "Sardor", "Aliyev", "andijan"),
+    (1005, "Doniyor", "Yusupov", "namangan"), (1006, "Otabek", "Saidov", "bukhara"),
+    (1007, "Shoxrux", "Ergashev", "tashkent"), (1008, "Ulug'bek", "Nazarov", "kashkadarya"),
+    (1009, "Temur", "Qodirov", "khorezm"),
+]
+GIRLS = [(2001, "Madina", "Usmonova", "tashkent_city"), (2002, "Nilufar", "Hasanova", "samarkand"),
+         (2003, "Zarina", "Abdullayeva", "jizzakh")]
+WAITING = [(4001, "Sanjar", "Mirzayev", "navoi")]          # qabul qilingan, startni kutmoqda
+PENDING = [(3001, "Yangi", "Kelganov", "sirdarya")]       # arizasi ko'rib chiqilmoqda
+
+SLOTS = [(dt.time(6, 0), dt.time(5, 0), "Erta qushlar"), (dt.time(6, 30), dt.time(5, 30), ""),
+         (dt.time(7, 0), dt.time(6, 0), "Yengil start")]
 
 REFLECTIONS = {
-    1002: "6:50 da turdim, 20 daqiqa yugurdim. Boshida qiyin edi, endi tanam o'rganyapti.",
+    1002: "6:30 da turdim, 20 daqiqa yugurdim. Boshida qiyin edi, endi tanam o'rganyapti.",
     1003: "Bugun kechikib qolishimga oz qoldi. Ertaga telefonni uzoqroqqa qo'yaman.",
     2002: "Ertalabki suv va toza havo — kayfiyat butun kun a'lo bo'ldi!",
 }
+GOAL = "Har kuni erta turib, sport va kitob bilan kunni boshlash."
 
 
 class Command(BaseCommand):
-    help = "Demo oqim va foydalanuvchilarni yaratadi (faqat DEBUG)."
+    help = "Demo oqimlar va foydalanuvchilarni yaratadi (faqat DEBUG)."
 
     def add_arguments(self, parser):
         parser.add_argument("--reset", action="store_true", help="Avvalgi demo ma'lumotni o'chirish.")
+
+    def register(self, tg, gender, first, last, region, **kw):
+        return services.register_user(telegram_id=tg, gender=gender, first_name=first, last_name=last,
+                                      region=region, goal=GOAL, **kw)
 
     @transaction.atomic
     def handle(self, *args, **opts):
         if not settings.DEBUG:
             raise CommandError("seed_demo faqat DEBUG rejimida ishlaydi.")
-        demo_ids = [tg for tg, _ in BOYS + GIRLS + PENDING]
+        demo_ids = [p[0] for p in BOYS + GIRLS + WAITING + PENDING]
+        names = [COHORT_NAME, NEXT_COHORT_NAME]
         if opts["reset"]:
-            Cohort.objects.filter(name=COHORT_NAME).delete()
+            # Membership.tribe PROTECT — avval a'zoliklar, keyin oqim
+            Membership.objects.filter(cohort__name__in=names).delete()
             User.objects.filter(telegram_id__in=demo_ids).delete()
+            Cohort.objects.filter(name__in=names).delete()
         elif Cohort.objects.filter(name=COHORT_NAME).exists():
             raise CommandError("Demo allaqachon bor. Qaytadan yaratish uchun: seed_demo --reset")
 
@@ -53,15 +83,11 @@ class Command(BaseCommand):
 
         members = []
         for gender, people in (("M", BOYS), ("F", GIRLS)):
-            for tg, name in people:
-                user = services.register_user(
-                    telegram_id=tg, gender=gender, first_name=name,
-                    goal="Har kuni 5:30 da turib, sport va kitob bilan kunni boshlash.",
-                )
+            for tg, first, last, region in people:
+                user = self.register(tg, gender, first, last, region,
+                                     current_wake_time=dt.time(7, 0), target_wake_time=dt.time(5, 30))
                 services.approve_user(user)
-                members.append(services.join_cohort(user, cohort, dt.time(7, 0), dt.time(5, 30)))
-        for tg, name in PENDING:
-            services.register_user(telegram_id=tg, gender="M", first_name=name, goal="Erta turishni o'rganmoqchiman.")
+                members.append(user.memberships.get(cohort=cohort))
 
         cohort.status = Cohort.Status.RUNNING
         cohort.save(update_fields=["status"])
@@ -78,8 +104,63 @@ class Command(BaseCommand):
                     record.status = DayRecord.Status.COMPLETED
                 record.save(update_fields=["status"])
             services.ensure_day_record(m, today)
+            # O'tgan kunlarga yarasha mukofotlar (bot xabarisiz)
+            survived = services.survived_days(m)
+            for stage in Stage.objects.filter(day__lte=survived):
+                Award.objects.get_or_create(membership=m, stage=stage)
 
-        Joker.objects.create(user=members[0].user, source=Joker.Source.SUNDAY)
+        # Bugungi raport turlicha bo'lsin: kimdir ovozli raport yuborgan, kimdir faqat turgan, kimdir hali yo'q
+        for i, m in enumerate(members[1:6], start=1):
+            record = services.ensure_day_record(m, today)
+            record.woke_at = timezone.now()
+            record.phrase = services.rules.random_phrase()
+            if i <= 3:
+                record.voice_at = timezone.now()
+                record.voice_file_id = f"demo-{m.id}"
+            record.save(update_fields=["woke_at", "phrase", "voice_at", "voice_file_id"])
+
+        # Rota chatida ko'rinishi uchun: bittasini admin tekshirgan, bittasi kech raport yuborgan
+        reviewed = services.ensure_day_record(members[1], today)
+        reviewed.admin_reviewed_at = timezone.now()
+        reviewed.save(update_fields=["admin_reviewed_at"])
+
+        late = services.ensure_day_record(members[6], today)
+        late.woke_at = timezone.now()
+        late.phrase = services.rules.random_phrase()
+        late.voice_at = timezone.now()
+        late.voice_file_id = f"demo-{members[6].id}"
+        late.voice_late = True
+        late.save(update_fields=["woke_at", "phrase", "voice_at", "voice_file_id", "voice_late"])
+
+        # Demo chat xabarlari (birinchi rota)
+        squad = members[0].squad
+        for m, text in (
+            (members[0], "Saf tayyor! Hammaga xayrli tong 💪"),
+            (members[1], "Bugun yengil yugurdim — kayfiyat zo'r."),
+            (members[2], "Erta turish endi osonroq bo'lyapti."),
+        ):
+            SquadMessage.objects.create(squad=squad, author=m, text=text)
+
+        # Tonggi rasm chelenji: bir nechta rasm va ovozlar
+        challenge = PhotoChallenge.objects.create(cohort=cohort, date=today, theme="Tong manzarasi")
+        palette = [(255, 122, 47), (108, 123, 255), (34, 178, 107), (224, 85, 154), (46, 179, 217)]
+        entries = []
+        for i, m in enumerate(members[:5]):
+            img = Image.new("RGB", (640, 640), palette[i % len(palette)])
+            draw = ImageDraw.Draw(img)
+            draw.ellipse((200, 120, 440, 360), fill=(255, 255, 255))
+            draw.text((60, 540), f"{m.user.first_name} — tong", fill=(255, 255, 255))
+            buf = BytesIO()
+            img.save(buf, "JPEG", quality=82)
+            entry = PhotoEntry.objects.create(challenge=challenge, membership=m)
+            entry.image.save(f"demo-{m.id}.jpg", ContentFile(buf.getvalue()), save=True)
+            entries.append(entry)
+        for voter in members[:7]:
+            for entry in entries:
+                if entry.membership_id != voter.id and (voter.id + entry.id) % 3:
+                    PhotoVote.objects.get_or_create(entry=entry, voter=voter)
+
+        Immunity.objects.create(user=members[0].user, source=Immunity.Source.SUNDAY)
 
         reading = Bounty.objects.create(cohort=cohort, date=today, title="20 bet kitob o'qish", reward=10)
         Bounty.objects.create(
@@ -94,7 +175,21 @@ class Command(BaseCommand):
         for tg, text in REFLECTIONS.items():
             Reflection.objects.create(membership=by_tg[tg], date=today, text=text)
 
+        # Keyingi oqim: 3 kundan keyin start, tayyor rotalar bilan
+        nxt = Cohort.objects.create(name=NEXT_COHORT_NAME, start_date=today + dt.timedelta(days=3))
+        slots = [WakeSlot.objects.create(cohort=nxt, start_wake_time=s, target_wake_time=t, title=title)
+                 for s, t, title in SLOTS]
+        for tg, first, last, region in WAITING:
+            services.approve_user(self.register(tg, "M", first, last, region, slot_id=slots[0].id))
+        for tg, first, last, region in PENDING:
+            self.register(tg, "M", first, last, region, slot_id=slots[1].id)
+
+        # Demo foydalanuvchilar soxta — bot ularning xabarlarini (adminlarga "Yangi ariza" ham) yubormasin.
+        # Hammasi bitta tranzaksiyada, shuning uchun ishlab turgan bot ularni ko'rib ulgurmaydi.
+        Notification.objects.filter(user__telegram_id__in=demo_ids, sent_at__isnull=True).update(sent_at=timezone.now())
+
         self.stdout.write(self.style.SUCCESS(
-            f"Demo tayyor: '{COHORT_NAME}', bugun {DAYS_PASSED + 1}-kun. "
-            f"{len(BOYS)} yigit, {len(GIRLS)} qiz, {len(PENDING)} tasdiq kutayotgan."
+            f"Demo tayyor: '{COHORT_NAME}' (bugun {DAYS_PASSED + 1}-kun, {len(members)} kishi) va "
+            f"'{NEXT_COHORT_NAME}' (start {nxt.start_date:%d.%m}, {len(SLOTS)} ta rota). "
+            f"Startni kutayotgan: {len(WAITING)}, tasdiq kutayotgan: {len(PENDING)}."
         ))

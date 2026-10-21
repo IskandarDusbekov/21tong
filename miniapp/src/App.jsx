@@ -1,18 +1,18 @@
 import { useState } from "react";
-import { Flame, LogOut, Route, Sun, Target, Trophy, Wrench } from "lucide-react";
+import { LogOut, MessagesSquare, Route, Sun, Target, Trophy, Wrench } from "lucide-react";
 import { api, devUser, inTelegram } from "./api.js";
-import { ToastProvider, useLoad } from "./ui.jsx";
+import { SoundToggle, ToastProvider, useLoad } from "./ui.jsx";
 import Bounties from "./screens/Bounties.jsx";
+import Chat from "./screens/Chat.jsx";
 import DevLogin from "./screens/DevLogin.jsx";
-import Feed from "./screens/Feed.jsx";
 import Journey from "./screens/Journey.jsx";
 import Rating from "./screens/Rating.jsx";
 import Today from "./screens/Today.jsx";
 
 const TABS = [
   { id: "today", label: "Bugun", icon: Sun },
+  { id: "chat", label: "Rota", icon: MessagesSquare },
   { id: "journey", label: "Yo'l", icon: Route },
-  { id: "feed", label: "Lenta", icon: Flame },
   { id: "bounty", label: "Bounty", icon: Target },
   { id: "rating", label: "Reyting", icon: Trophy },
 ];
@@ -29,6 +29,7 @@ function Main({ dev, onLogout }) {
 
   return (
     <div className="app">
+      <SoundToggle />
       {dev && (
         <div className="devbar">
           <span><Wrench size={14} />Dev: <b>{dev.name}</b> · {dev.gender === "F" ? "qiz" : "yigit"}</span>
@@ -39,8 +40,8 @@ function Main({ dev, onLogout }) {
       )}
       <main>
         {tab === "today" && <Today me={me} error={error} reload={reload} />}
+        {tab === "chat" && <Chat me={me} />}
         {tab === "journey" && <Journey me={me} error={error} />}
-        {tab === "feed" && <Feed me={me} />}
         {tab === "bounty" && <Bounties me={me} reloadMe={reload} />}
         {tab === "rating" && <Rating />}
       </main>
