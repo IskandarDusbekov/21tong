@@ -65,7 +65,8 @@ def _clean_name(value, field):
 
 @transaction.atomic
 def register_user(*, telegram_id, gender, goal, username="", first_name="", last_name="", region="",
-                  slot_id=None, referral_code=None, current_wake_time=None, target_wake_time=None):
+                  slot_id=None, referral_code=None, current_wake_time=None, target_wake_time=None,
+                  tg_first_name="", tg_last_name="", tg_language="", tg_is_premium=False):
     """Botdagi ariza yakunlanganda chaqiriladi. Jins keyin o'zgarmaydi. Adminlarga xabar ketadi."""
     if gender not in Gender.values:
         raise RuleError("Jins noto'g'ri ko'rsatilgan.")
@@ -87,14 +88,23 @@ def register_user(*, telegram_id, gender, goal, username="", first_name="", last
     user, created = User.objects.get_or_create(
         telegram_id=telegram_id, defaults={"username": f"tg{telegram_id}", "telegram_username": username},
     )
+    # Telegram'ning o'z ma'lumotlari — har safar eng so'nggisiga yangilanadi
+    user.telegram_username = username or user.telegram_username
+    user.telegram_first_name = tg_first_name or user.telegram_first_name
+    user.telegram_last_name = tg_last_name or user.telegram_last_name
+    user.telegram_language = tg_language or user.telegram_language
+    if tg_is_premium:
+        user.telegram_is_premium = True
+
     if user.gender and user.gender != gender:
         raise RuleError("Jinsni o'zgartirib bo'lmaydi.")
     if user.status in (User.Status.APPROVED, User.Status.REJECTED):
+        user.save(update_fields=["telegram_username", "telegram_first_name", "telegram_last_name",
+                                 "telegram_language", "telegram_is_premium"])
         return user
 
     user.gender = gender
     user.goal = goal.strip()
-    user.telegram_username = username or user.telegram_username
     if first_name:
         user.first_name = _clean_name(first_name, "Ism")
     if last_name:
@@ -141,7 +151,6 @@ def placement_payload(m):
         "squad": m.squad.name if m.squad_id else "—",
         "alarm": m.tribe.start_wake_time.strftime("%H:%M"),
         "target": m.target_wake_time.strftime("%H:%M"),
-        "invite_link": m.squad.invite_link if m.squad_id else "",
     }
 
 
@@ -281,12 +290,16 @@ def press_wake(membership, now=None):
     return record
 
 
-def proof_record(membership, now):
+def is_late(record, now):
+    return now > rules.proof_deadline(record.date, record.alarm_time, now.tzinfo, record.day_number)
+
+
+def proof_record(membership, now, allow_late=False):
     """Raport qabul qilishdan oldingi umumiy tekshiruvlar."""
     record = _today_record(membership, now)
     if not record.woke_at:
         raise RuleError("Avval «Uyg'ondim» tugmasini bosing — keyin o'qiladigan gap beriladi.")
-    if now > rules.proof_deadline(record.date, record.alarm_time, now.tzinfo, record.day_number):
+    if not allow_late and is_late(record, now):
         raise RuleError(
             f"Kechikding. Raport budilnikdan keyin {rules.proof_minutes(record.day_number)} daqiqa ichida "
             "yuborilishi kerak edi."
@@ -295,9 +308,13 @@ def proof_record(membership, now):
 
 
 def record_voice(membership, file_id="", now=None):
-    """Ovozli raport: bot bergan gap o'qilgan voice — botga shaxsiy yuboriladi."""
+    """
+    Ovozli raport: bot bergan gap o'qilgan voice — botga shaxsiy yuboriladi.
+    Kech kelsa ham qabul qilinadi (rota chatiga tushadi), lekin «kech» deb belgilanadi va kun bajarilgan
+    hisoblanmaydi — hamma buni ko'radi.
+    """
     now = local_now(now)
-    record = proof_record(membership, now)
+    record = proof_record(membership, now, allow_late=True)
     if rules.video_required(record.day_number):
         raise RuleError(
             f"{rules.current().video_from_day}-kundan boshlab ovoz emas — tashqarida yozilgan video krujok kerak."
@@ -306,8 +323,26 @@ def record_voice(membership, file_id="", now=None):
         raise RuleError("Bugungi ovozli raport allaqachon qabul qilingan.")
     record.voice_at = now
     record.voice_file_id = file_id
-    record.save(update_fields=["voice_at", "voice_file_id"])
+    record.voice_late = is_late(record, now)
+    record.save(update_fields=["voice_at", "voice_file_id", "voice_late"])
     return record
+
+
+@transaction.atomic
+def admin_review_report(record, now=None):
+    """Qo'mondonlik raportni ko'zdan kechirdi — chatda hammaga 'Admin tekshirdi' yorlig'i chiqadi."""
+    now = now or timezone.now()
+    stamped = False
+    if record.voice_at and not record.admin_reviewed_at:
+        record.admin_reviewed_at = now
+        record.save(update_fields=["admin_reviewed_at"])
+        stamped = True
+    video = getattr(record, "video", None)
+    if video and not video.admin_reviewed_at:
+        video.admin_reviewed_at = now
+        video.save(update_fields=["admin_reviewed_at"])
+        stamped = True
+    return stamped
 
 
 def proof_kind(day_number):
@@ -319,6 +354,8 @@ def day_progress(record: DayRecord):
     tz = timezone.get_current_timezone()
     kind = proof_kind(record.day_number)
     deadline = rules.proof_deadline(record.date, record.alarm_time, tz, record.day_number)
+    voice_ok = bool(record.voice_at) and not record.voice_late
+    admin_reviewed = bool(record.admin_reviewed_at) or bool(video and video.admin_reviewed_at)
     return {
         "date": record.date.isoformat(),
         "day_number": record.day_number,
@@ -330,9 +367,11 @@ def day_progress(record: DayRecord):
         "proof_deadline": timezone.localtime(deadline).strftime("%H:%M"),
         "proof_minutes": rules.proof_minutes(record.day_number),
         "voice": bool(record.voice_at),
+        "voice_late": record.voice_late,
+        "admin_reviewed": admin_reviewed,
         "video_required": kind == "video",
         "video": video.status if video else None,
-        "proof_done": bool(record.voice_at) if kind == "voice" else (video is not None and video.status != "rejected"),
+        "proof_done": voice_ok if kind == "voice" else (video is not None and video.status != "rejected"),
     }
 
 
@@ -417,10 +456,9 @@ class StrikeResult:
 
 
 def _squad_payload(membership):
-    """Rota guruhiga ham e'lon qilinadi — lagerda hamma bir-biri uchun javobgar."""
+    """Ogohlantirish/chiqarish rota chatida ham ko'rinadi — lagerda hamma bir-biri uchun javobgar."""
     return {
         "name": membership.user.first_name or str(membership.user),
-        "squad_chat_id": membership.squad.telegram_chat_id if membership.squad_id else None,
     }
 
 
@@ -484,7 +522,8 @@ def _failure_reason(record: DayRecord, tz):
     if not record.woke_at or record.woke_at > rules.wake_deadline(record.date, record.alarm_time, tz):
         return Strike.Reason.LATE
     if not rules.video_required(record.day_number):
-        return None if record.voice_at else Strike.Reason.NO_VOICE
+        # Kech kelgan ovozli raport ham qabul qilingan, lekin kun bajarilgan hisoblanmaydi.
+        return None if (record.voice_at and not record.voice_late) else Strike.Reason.NO_VOICE
     video = getattr(record, "video", None)
     if video is None:
         return Strike.Reason.NO_VIDEO
@@ -650,7 +689,6 @@ def squad_report(squad, date):
     return {
         "squad": squad.name,
         "tribe": str(squad.tribe),
-        "chat_id": squad.telegram_chat_id,
         "day_number": squad.tribe.cohort.day_number(date),
         "members": rows,
         "done": sum(r["status"] == "done" for r in active),

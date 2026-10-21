@@ -29,14 +29,6 @@
     {% endfor %}
   </div>
 
-  {% if dashboard.unlinked_squads %}
-  <div class="tong-box tong-alert">
-    <b>{{ dashboard.unlinked_squads }} ta rotaning Telegram guruhi ulanmagan.</b>
-    Guruh oching, botni admin qiling va guruhda <code>/ulash</code> yozing.
-    <a href="{{ dashboard.squads_url }}">Rotalarni ko'rish →</a>
-  </div>
-  {% endif %}
-
   <div class="tong-box">
     <h3>Oqimlar</h3>
     {% for c in dashboard.cohorts %}

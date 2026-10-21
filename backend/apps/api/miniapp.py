@@ -1,6 +1,7 @@
 """Telegram Mini App API. Foydalanuvchi initData (yoki lokal dev kirish) orqali aniqlanadi."""
+import httpx
 from django.conf import settings
-from django.http import Http404, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import exceptions
 from rest_framework.permissions import IsAuthenticated
@@ -11,9 +12,10 @@ from apps.accounts.auth import DevAuthentication, TelegramInitDataAuthentication
 from apps.accounts.models import User
 from apps.camp import rules, services
 from apps.camp.awards import render_award
-from apps.camp.models import Award
+from apps.camp.models import Award, DayRecord
 from apps.community import services as community
-from apps.community.models import Bounty, Reflection
+from apps.community.models import Bounty, PhotoEntry, Reflection
+from apps.proofs.models import VideoProof
 
 from .common import membership_summary
 
@@ -81,8 +83,52 @@ class SquadView(AppView):
         for row in report["members"]:
             row["me"] = row.pop("telegram_id") == request.user.telegram_id
             row.pop("membership_id")
-        report.pop("chat_id")
         return Response(report)
+
+
+class ChatView(AppView):
+    """Rota chati: raportlar, ogohlantirishlar, bosqichlar va matn xabarlari (Telegram guruh o'rniga)."""
+
+    def get(self, request):
+        return Response(community.squad_chat(self.membership()))
+
+    def post(self, request):
+        msg = community.post_chat_message(self.membership(), request.data.get("text", ""))
+        return Response({"id": msg.id, "text": msg.text}, status=201)
+
+
+def _stream_telegram_file(file_id, content_type):
+    """Raport media'sini (ovoz/video) Telegram'dan oqim qilib qaytaradi — ilovada eshitiladi/ko'riladi."""
+    token = settings.TELEGRAM_BOT_TOKEN
+    if not token or not file_id or file_id.startswith("demo-"):
+        raise Http404
+    base = f"https://api.telegram.org/bot{token}"
+    try:
+        info = httpx.get(f"{base}/getFile", params={"file_id": file_id}, timeout=15).json()
+        path = info["result"]["file_path"]
+        upstream = httpx.stream("GET", f"https://api.telegram.org/file/bot{token}/{path}", timeout=60)
+    except (httpx.HTTPError, KeyError, TypeError):
+        raise Http404
+    cm = upstream.__enter__()
+    resp = StreamingHttpResponse(
+        (chunk for chunk in cm.iter_bytes()), content_type=cm.headers.get("content-type", content_type)
+    )
+    resp["Cache-Control"] = "private, max-age=86400"
+    return resp
+
+
+class ProofMediaView(AppView):
+    """Faqat o'z rotasidagi raportning ovozi/videosi."""
+
+    def get(self, request, kind, pk):
+        m = self.membership()
+        if kind == "voice":
+            record = get_object_or_404(DayRecord, pk=pk, membership__squad=m.squad_id)
+            return _stream_telegram_file(record.voice_file_id, "audio/ogg")
+        if kind == "video":
+            proof = get_object_or_404(VideoProof, pk=pk, day__membership__squad=m.squad_id)
+            return _stream_telegram_file(proof.telegram_file_id, "video/mp4")
+        raise Http404
 
 
 class FreezeView(AppView):
@@ -166,9 +212,41 @@ class AwardImageView(AppView):
 
 
 class LeaderboardView(AppView):
+    """Ko'p bosqichli reyting: rota ichida, rotalar o'rtasida, qabila eng zo'rlari."""
+
     def get(self, request):
+        return Response(community.ranking(self.membership()))
+
+
+class PhotosView(AppView):
+    """Tonggi rasm chelenji: o'z qabilasidagi rasmlar va yangisini yuklash."""
+
+    def get(self, request):
+        return Response(community.photo_feed(self.membership()))
+
+    def post(self, request):
+        entry = community.upload_photo(self.membership(), request.FILES.get("image"))
+        return Response({"id": entry.id}, status=201)
+
+
+class PhotoVoteView(AppView):
+    def post(self, request, pk):
         m = self.membership()
-        return Response([
-            {"name": x.user.first_name or "Ishtirokchi", "coins": x.coins, "me": x.id == m.id}
-            for x in community.leaderboard(m)
-        ])
+        entry = get_object_or_404(PhotoEntry, pk=pk)
+        voted = community.vote_photo(m, entry)
+        return Response({"voted": voted})
+
+
+class PhotoImageView(AppView):
+    """Faqat o'z qabilasidagi (bir jinsdagi) rasmni ko'rsatadi."""
+
+    def get(self, request, pk):
+        m = self.membership()
+        entry = get_object_or_404(
+            PhotoEntry.objects.select_related("membership__tribe", "challenge"),
+            pk=pk, challenge__cohort_id=m.cohort_id, membership__tribe__gender=m.tribe.gender,
+        )
+        try:
+            return FileResponse(entry.image.open("rb"), content_type="image/jpeg")
+        except FileNotFoundError:
+            raise Http404

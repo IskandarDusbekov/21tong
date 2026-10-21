@@ -1,7 +1,45 @@
 from django.contrib import admin
 from django.db.models import Count
 
-from .models import Bounty, BountyCompletion, CoinTransaction, Reflection
+from .models import (
+    Bounty, BountyCompletion, CoinTransaction, PhotoChallenge, PhotoEntry, Reflection, SquadMessage,
+)
+
+
+@admin.register(PhotoChallenge)
+class PhotoChallengeAdmin(admin.ModelAdmin):
+    list_display = ("date", "title", "cohort", "theme", "max_entries", "entries_count")
+    list_filter = ("cohort", "date")
+    date_hierarchy = "date"
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(n=Count("entries"))
+
+    @admin.display(description="Rasmlar", ordering="n")
+    def entries_count(self, obj):
+        return obj.n
+
+
+@admin.register(PhotoEntry)
+class PhotoEntryAdmin(admin.ModelAdmin):
+    list_display = ("challenge", "membership", "votes", "created_at")
+    list_filter = ("challenge__cohort",)
+    raw_id_fields = ("challenge", "membership")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(n=Count("votes"))
+
+    @admin.display(description="Ovozlar", ordering="n")
+    def votes(self, obj):
+        return obj.n
+
+
+@admin.register(SquadMessage)
+class SquadMessageAdmin(admin.ModelAdmin):
+    list_display = ("squad", "author", "text", "created_at")
+    list_filter = ("squad__tribe__cohort", "created_at")
+    search_fields = ("text", "author__user__first_name")
+    raw_id_fields = ("squad", "author")
 
 
 @admin.register(Reflection)

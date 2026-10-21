@@ -1,5 +1,5 @@
 import {
-  ArrowRightLeft, Award, Crown, RotateCcw, ShieldAlert, ShieldCheck, Target, Undo2, UserX,
+  ArrowRightLeft, Award, Crown, RotateCcw, Send, ShieldAlert, ShieldCheck, Target, Undo2, UserX,
 } from "lucide-react";
 import { api } from "../api.js";
 import {
@@ -68,6 +68,22 @@ export default function MemberDrawer({ id, onClose, onChanged }) {
           </div>
 
           <div className="card card-pad">
+            <div className="row-between" style={{ marginBottom: 10 }}>
+              <div className="row" style={{ gap: 8 }}><Send size={16} color="var(--sun)" /><b>Telegram / aloqa</b></div>
+              {m.user.tg_link && (
+                <a className="btn btn-outline btn-sm" href={m.user.tg_link} target="_blank" rel="noreferrer"><Send size={14} /> Yozish</a>
+              )}
+            </div>
+            <div className="row small muted" style={{ gap: 16, flexWrap: "wrap" }}>
+              {m.user.username && <span>@{m.user.username}</span>}
+              <span>ID: <b className="num" style={{ color: "var(--text)" }}>{m.user.telegram_id}</b></span>
+              {m.user.telegram_name && <span>TG: {m.user.telegram_name}</span>}
+              {m.user.language && <span>Til: {m.user.language}</span>}
+              {m.user.is_premium && <span style={{ color: "var(--sun)" }}>Premium ⭐</span>}
+            </div>
+          </div>
+
+          <div className="card card-pad">
             <h3 style={{ marginBottom: 10 }}>{m.journey.duration} kunlik kalendar</h3>
             <div className="cal" style={{ marginBottom: 6 }}>
               {WEEKDAYS.map((w) => <span key={w} className="muted small" style={{ textAlign: "center", fontWeight: 600 }}>{w}</span>)}
@@ -100,7 +116,7 @@ export default function MemberDrawer({ id, onClose, onChanged }) {
               })}><ShieldAlert size={16} /> Ogohlantirish berish</button>
               {m.status === "active" ? (
                 <button className="btn btn-bad" disabled={busy} onClick={act({ action: "expel" }, {
-                  title: "Lagerdan chiqarasizmi?", text: `${m.user.name} lagerdan chiqariladi va rota guruhidan haydaladi.`, confirm: "Chiqarish", danger: true,
+                  title: "Lagerdan chiqarasizmi?", text: `${m.user.name} lagerdan chiqariladi.`, confirm: "Chiqarish", danger: true,
                 })}><UserX size={16} /> Lagerdan chiqarish</button>
               ) : (
                 <button className="btn btn-outline" disabled={busy} onClick={act({ action: "restore" })}><Undo2 size={16} /> Lagerga qaytarish</button>

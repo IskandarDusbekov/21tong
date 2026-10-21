@@ -22,7 +22,6 @@ USER_COMMANDS = [
 ]
 ADMIN_COMMANDS = USER_COMMANDS + [
     BotCommand(command="arizalar", description="Kutilayotgan arizalar"),
-    BotCommand(command="ulash", description="Guruhni rotaga ulash (guruh ichida)"),
 ]
 
 

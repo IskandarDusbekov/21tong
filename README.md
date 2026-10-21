@@ -12,11 +12,11 @@ backend/            Django + DRF — barcha biznes-qoidalar shu yerda
     rules.py        Lager raqamlari va sof funksiyalar (Kaizen, bosqichlar, kvorum, gaplar...)
     services.py     Holatni o'zgartiruvchi yagona joy (bot ham, Mini App ham shu orqali)
   apps/proofs/      Video raport va P2P tekshiruv (avval rotadan, faqat bir jinsdagilar)
-  apps/community/   Kechki refleksiya, 🔥, Bounty, IrodaCoin
+  apps/community/   Rota chati, kechki refleksiya, 🔥, Bounty, IrodaCoin, tonggi rasm chelenji, reyting
   apps/control/     Admin paneldan boshqariladigan sozlamalar, gaplar, bosqichlar, bot matnlari, ommaviy xabar
   apps/api/         /api/bot/* (X-Bot-Secret) va /api/app/* (Telegram initData)
-bot/                aiogram 3 — ariza, admin tasdig'i, buyruqlar, raportlar, budilnik, rota guruhlari
-miniapp/            React + Vite — Bugun / Yo'l / Lenta / Bounty / Reyting
+bot/                aiogram 3 — ariza, admin tasdig'i, buyruqlar, raportlar, budilnik
+miniapp/            React + Vite — Bugun / Rota (chat) / Yo'l / Bounty / Reyting
 panel/              React + Vite — admin uchun boshqaruv paneli (/panel/)
 ```
 
@@ -34,7 +34,7 @@ Kirish — admin login va parolingiz (`createsuperuser` bilan yaratilgan, `is_st
 - **Ishtirokchilar** — qidiruv va filtrlar; har bir odam uchun 21 kunlik kalendar, ogohlantirishlar,
   Immunitet berish, ogohlantirish berish/bekor qilish, chiqarish/qaytarish, rotani o'zgartirish,
   bajarilmagan kunni uzrli qilish.
-- **Rotalar** — har rota kim turdi, kim yo'q; guruh ulanganmi.
+- **Rotalar** — har rota kim turdi, kim yo'q (rota muloqoti Mini App ichidagi chatda).
 - **Video raportlar**, **Oqimlar** (yaratish, qabulni ochish, boshlash, yakunlash), **Ommaviy xabar**
   (oldindan ko'rish va qabul qiluvchilar soni bilan).
 - **Lager qoidalari** — barcha sozlamalar va ularning amalda qanday ishlashini ko'rsatuvchi jonli misol.
@@ -50,8 +50,8 @@ Tez ishlab chiqish uchun `npm run dev` (http://localhost:5174/panel/, API Django
 
 ## Django admin — texnik boshqaruv
 
-http://localhost:8000/admin/ — bosh sahifada bugungi holat: yangi arizalar, raport berganlar, ogohlantirishlar,
-ulanmagan rota guruhlari va tezkor havolalar.
+http://localhost:8000/admin/ — bosh sahifada bugungi holat: yangi arizalar, raport berganlar, ogohlantirishlar
+va tezkor havolalar.
 
 | Bo'lim | Nima qilish mumkin |
 |---|---|
@@ -93,12 +93,20 @@ Do'st taklifi Immunitet bermaydi (sozlamada yoqish mumkin).
    Admin panelda video yoqilsa (masalan 7-kundan) — o'sha kundan tashqarida yozilgan video krujok so'raladi,
    uni rotadan 3 kishi gap bilan solishtirib tekshiradi.
 4. Budilnik **3-kundan** boshlab har kuni 5 daqiqaga oldinga suriladi — maqsad vaqtigacha.
-5. Raport rota guruhiga avtomatik e'lon qilinadi. Tonggi oyna yopilganda guruhga **TONGGI RAPORT** chiqadi:
-   kim safda, kim turib raport bermadi, kim umuman yo'q.
+5. Raport **Mini App ichidagi rota chatida** paydo bo'ladi — rotadoshlar ovozni eshitadi, videoni ko'radi.
+   Admin tekshirsa «Admin tekshirdi» yozuvi hammaga ko'rinadi. Kech kelgan raport ham chatga tushadi, lekin
+   «qabul qilinmadi» deb belgilanadi va kun bajarilgan hisoblanmaydi. Chat sarlavhasida safda nechta (X/Y) turibdi.
 
-**Jazo.** Bajarmaslik — ogohlantirish (rota guruhiga ham e'lon qilinadi). 3 ta — lagerdan chiqariladi va guruhdan haydaladi.
+**Jazo.** Bajarmaslik — ogohlantirish (rota chatida ham ko'rinadi). 3 ta — lagerdan chiqariladi.
 **Immunitet** (avvalgi "Joker") keyingi ogohlantirishni o'chiradi: yakshanba barvaqt turganlarga, do'st taklif qilganlarga
 yoki qo'mondonlik tomonidan beriladi.
+
+**Tonggi rasm chelenji.** Har kuni «Bounty» bo'limida — har kishi 2 tagacha rasm yuboradi, qabiladoshlar 🔥 beradi,
+eng ko'p ovoz olgan rasm yuqoriga chiqadi. Olingan ovozlar reytingga ta'sir qiladi.
+
+**Reyting (3 daraja).** «Reyting» bo'limida: (1) **Rotam** — rota ichidagi shaxslar, (2) **Rotalar** — rotalar o'rtasida
+(o'rtacha ball bo'yicha), (3) **Eng zo'rlar** — butun qabila bo'yicha eng kuchlilar. Ball = bajarilgan kun·10 +
+IrodaCoin + rasm chelenjidagi 🔥·5.
 
 Yuqoridagi barcha raqamlar standart qiymatlar — admin panelda o'zgartiriladi.
 
@@ -110,11 +118,11 @@ Yuqoridagi barcha raqamlar standart qiymatlar — admin panelda o'zgartiriladi.
 | Ariza va admin tasdig'i (Telegram'da) | `bot/handlers/onboarding.py`, `bot/handlers/admin.py`, `services.approve_user` |
 | 7 kishilik rota | `rules.SQUAD_SIZE`, `services.assign_squad` |
 | Manifest + do'st taklifi → 1 Immunitet | `accounts/manifest.py`; Joker do'st **tasdiqlanganda** beriladi |
-| Gender-izolyatsiya | Qabila `(oqim, jins, vaqt)`; rota guruhiga kirish faqat so'rov orqali, bot tekshiradi |
+| Gender-izolyatsiya | Qabila `(oqim, jins, vaqt)`; rota chati faqat o'z rotasiga ko'rinadi |
 | Kaizen −5 daqiqa | `rules.alarm_time_for_day` |
 | Uyg'ondim → gap → raport | `services.press_wake`, `record_voice`, `proofs.submit_video` |
 | 3 tadan 2 tasi tasdiqlasa | `proofs.services.cast_vote`, `rules.approval_threshold` |
-| Oynalar 05:30–07:30, 20:30–21:30 | `Cohort` maydonlari; bot rota chatini qulflaydi/ochadi |
+| Oynalar 05:30–07:30, 20:30–21:30 | `Cohort` maydonlari; chatga yozish faqat oyna ochiqligida (server tekshiradi) |
 | Tonggi raport | `services.squad_report`, `bot/tasks.py` |
 | 3 ogohlantirish = chiqarish, Immunitet o'chiradi | `services.issue_strike` |
 | Yakshanba: ogohlantirish yo'q, bajarsa Immunitet | `services.evaluate_day` |
@@ -161,8 +169,15 @@ cd bot && ../venv/Scripts/python main.py
 
 "Bot ishga tushdi: @..." chiqsa — tayyor. Botga `/start` yozib arizani sinab ko'ring; ariza sizga tugmalar bilan keladi.
 
-**Rota guruhini ulash:** Telegram'da yopiq guruh oching → botni qo'shib **admin** qiling → guruhda `/ulash` →
-rotani tanlang. Bot kirish havolasini yaratadi, rota a'zolariga yuboradi va guruhga faqat shu rota a'zolarini kiritadi.
+**Rota chati:** Telegram guruh kerak emas — rota muloqoti, raportlar va tonggi raport **Mini App ichidagi
+«Rota» bo'limida**. Chatga yozish faqat tonggi va kechki oyna vaqtida ochiq; qolgan vaqt faqat kuzatiladi.
+Kechki refleksiya ham shu chatda — kechqurun «Bugungi kun qanday o'tdi?» deb so'raladi, rotadoshlar 🔥 beradi.
+
+**Bot pastki menyu:** qabul qilingan foydalanuvchiga doimiy tugmalar chiqadi — 📱 Mini App · ☀️ Holatim ·
+📘 Yo'riqnoma · 📜 Nizom · 👥 Do'st taklif. Har biri aniq amal bajaradi.
+
+**Mini App his-tuyg'usi:** «Uyg'ondim» marosimi (quyosh portlashi), bosqich ochilishi va chat animatsiyalari;
+yengil ovoz belgilari (yuqori o'ngdagi 🔊 tugmasi bilan o'chiriladi). `prefers-reduced-motion` hurmat qilinadi.
 
 ### Telegram'siz brauzerda ko'rish (Dev kirish)
 

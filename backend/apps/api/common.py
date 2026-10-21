@@ -36,8 +36,6 @@ def membership_summary(membership):
         "cohort": {"id": membership.cohort_id, "name": membership.cohort.name, "status": membership.cohort.status},
         "tribe": str(membership.tribe),
         "squad": membership.squad.name if membership.squad_id else None,
-        "squad_chat_id": membership.squad.telegram_chat_id if membership.squad_id else None,
-        "squad_invite_link": membership.squad.invite_link if membership.squad_id else "",
         "start_wake_time": membership.tribe.start_wake_time.strftime("%H:%M"),
         "target_wake_time": membership.target_wake_time.strftime("%H:%M"),
         "status": membership.status,

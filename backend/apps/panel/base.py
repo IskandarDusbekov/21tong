@@ -15,6 +15,10 @@ def person(user):
         "username": user.telegram_username,
         "region": user.get_region_display() if user.region else "",
         "telegram_id": user.telegram_id,
+        "telegram_name": user.telegram_full_name,
+        "language": user.telegram_language,
+        "is_premium": user.telegram_is_premium,
+        "tg_link": user.telegram_link,
         "gender": user.gender,
     }
 

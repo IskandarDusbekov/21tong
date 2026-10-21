@@ -47,7 +47,7 @@ async def start(message: Message, command: CommandObject, state: FSMContext):
     if status == "pending":
         return await message.answer(texts.t("already_pending"))
     if status == "approved":
-        return await message.answer(texts.welcome_back(user))
+        return await message.answer(texts.welcome_back(user), reply_markup=keyboards.main_menu())
     if status == "rejected":
         return await message.answer(texts.t("rejected"))
     await show_welcome(message, state, command.args)
@@ -62,23 +62,36 @@ async def begin(call: CallbackQuery, state: FSMContext):
 
 
 @router.message(Command("holat"))
+@router.message(F.text == keyboards.BTN_STATUS)
 async def holat(message: Message):
     user = await backend.get_user(message.from_user.id)
     if not user:
         return await message.answer(texts.t("not_registered"))
     if user["status"] != "approved":
         return await message.answer(texts.t("already_pending") if user["status"] == "pending" else texts.t("rejected"))
-    await message.answer(texts.welcome_back(user))
+    await message.answer(texts.welcome_back(user), reply_markup=keyboards.main_menu())
 
 
 @router.message(Command("nizom"))
+@router.message(F.text == keyboards.BTN_RULES)
 async def nizom(message: Message):
     await message.answer(texts.t("rules"))
 
 
 @router.message(Command("yoriqnoma"))
+@router.message(F.text == keyboards.BTN_GUIDE)
 async def guide(message: Message):
     await message.answer(texts.t("guide"))
+
+
+@router.message(F.text == keyboards.BTN_REFERRAL)
+async def referral(message: Message):
+    user = await backend.get_user(message.from_user.id)
+    if not user or user["status"] != "approved":
+        return await message.answer(texts.t("not_registered"))
+    me = await message.bot.me()
+    link = f"https://t.me/{me.username}?start={user['referral_code']}"
+    await message.answer(texts.t("referral_share", link=link))
 
 
 # --- Anketa savollari ------------------------------------------------------------
@@ -185,6 +198,8 @@ async def send(call: CallbackQuery, state: FSMContext):
             first_name=data["first_name"], last_name=data["last_name"], region=data["region"],
             slot_id=data["slot"]["id"], username=u.username or "",
             referral_code=data.get("referral_code"),
+            tg_first_name=u.first_name or "", tg_last_name=u.last_name or "",
+            tg_language=u.language_code or "", tg_is_premium=bool(u.is_premium),
         )
     except ApiError as e:
         return await call.answer(str(e.detail), show_alert=True)

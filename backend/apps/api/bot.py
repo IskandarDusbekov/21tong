@@ -12,7 +12,7 @@ from apps.accounts.manifest import render_manifest
 from apps.accounts.models import Region, User
 from apps.camp import services
 from apps.camp.awards import render_award
-from apps.camp.models import Award, Cohort, DayRecord, Membership, Notification, Squad, WakeSlot
+from apps.camp.models import Award, Cohort, DayRecord, Membership, Notification, WakeSlot
 from apps.control.models import BotMessage, CampSettings
 from apps.proofs import services as proof_services
 from apps.proofs.models import Review
@@ -51,12 +51,11 @@ def user_payload(user):
 
 
 def proof_payload(membership, record):
-    """Raport qabul qilingach bot uchun: rota guruhiga qayta joylash ma'lumotlari."""
+    """Raport qabul qilingach bot uchun javob (bot foydalanuvchiga tasdiq yuboradi)."""
     return {
         **services.day_progress(record),
         "name": membership.user.first_name or str(membership.user),
         "squad": membership.squad.name if membership.squad_id else None,
-        "squad_chat_id": membership.squad.telegram_chat_id if membership.squad_id else None,
     }
 
 
@@ -88,6 +87,8 @@ class RegisterView(BotView):
             referral_code=d.get("referral_code"),
             current_wake_time=parse_time(current, "current_wake_time") if current else None,
             target_wake_time=parse_time(target, "target_wake_time") if target else None,
+            tg_first_name=d.get("tg_first_name", ""), tg_last_name=d.get("tg_last_name", ""),
+            tg_language=d.get("tg_language", ""), tg_is_premium=bool(d.get("tg_is_premium")),
         )
         return Response(user_payload(user), status=201)
 
@@ -252,26 +253,6 @@ class AlarmsView(BotView):
         return Response(result)
 
 
-def running_squads():
-    return Squad.objects.filter(
-        tribe__cohort__status=Cohort.Status.RUNNING, telegram_chat_id__isnull=False
-    ).select_related("tribe__cohort")
-
-
-class WindowsView(BotView):
-    """Rota chatlari va ularning ochiq oynalari — bot chatlarni qulflash/ochish uchun."""
-
-    def get(self, request):
-        return Response([
-            {
-                "chat_id": s.telegram_chat_id,
-                "morning": [s.tribe.cohort.morning_window_start.strftime("%H:%M"), s.tribe.cohort.morning_window_end.strftime("%H:%M")],
-                "evening": [s.tribe.cohort.evening_window_start.strftime("%H:%M"), s.tribe.cohort.evening_window_end.strftime("%H:%M")],
-            }
-            for s in running_squads()
-        ])
-
-
 class AwardImageView(BotView):
     def get(self, request, pk):
         award = get_object_or_404(Award.objects.select_related("membership__user", "membership__cohort", "stage"), pk=pk)
@@ -291,46 +272,3 @@ class RunDailyView(BotView):
     def post(self, request):
         call_command("run_daily")
         return Response({"ok": True})
-
-
-class RollCallView(BotView):
-    """Tonggi oyna yopilganda rota guruhlariga chiqadigan RAPORT."""
-
-    def get(self, request):
-        today = services.local_now().date()
-        reports = []
-        for s in running_squads():
-            if s.tribe.cohort.day_number(today) is None:
-                continue
-            reports.append({
-                **services.squad_report(s, today),
-                "morning_end": s.tribe.cohort.morning_window_end.strftime("%H:%M"),
-            })
-        return Response(reports)
-
-
-# --- Rota guruhlarini ulash -------------------------------------------------------
-
-class SquadsView(BotView):
-    def get(self, request):
-        qs = Squad.objects.exclude(tribe__cohort__status=Cohort.Status.FINISHED).select_related("tribe__cohort")
-        if request.query_params.get("unlinked"):
-            qs = qs.filter(telegram_chat_id__isnull=True)
-        return Response([
-            {"id": s.id, "name": s.name, "tribe": str(s.tribe), "cohort": s.tribe.cohort.name, "chat_id": s.telegram_chat_id}
-            for s in qs
-        ])
-
-
-class SquadLinkView(BotView):
-    """Admin guruhda /ulash qilib rotani tanladi — guruh shu rotaga bog'lanadi."""
-
-    def post(self, request, squad_id):
-        (chat_id,) = require(request.data, "chat_id")
-        squad = get_object_or_404(Squad, pk=squad_id)
-        Squad.objects.filter(telegram_chat_id=int(chat_id)).exclude(pk=squad.pk).update(telegram_chat_id=None)
-        squad.telegram_chat_id = int(chat_id)
-        squad.invite_link = request.data.get("invite_link") or squad.invite_link
-        squad.save(update_fields=["telegram_chat_id", "invite_link"])
-        members = list(squad.memberships.filter(status=Membership.Status.ACTIVE).values_list("user__telegram_id", flat=True))
-        return Response({"id": squad.id, "name": squad.name, "tribe": str(squad.tribe), "members": members})

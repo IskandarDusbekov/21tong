@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BedDouble, CheckCircle2, ExternalLink, Hourglass, Link2, Link2Off, Snowflake, UserX, UsersRound, XCircle } from "lucide-react";
+import { BedDouble, CheckCircle2, Hourglass, Snowflake, UserX, UsersRound, XCircle } from "lucide-react";
 import { api } from "../api.js";
 import { Avatar, Empty, ErrorBox, PageHead, Pill, Seg, Skeleton, TODAY_STATUS, useLoad } from "../ui.jsx";
 import MemberDrawer from "./MemberDrawer.jsx";
@@ -36,14 +36,6 @@ function SquadCard({ s, onOpen }) {
           );
         })}
       </ul>
-      <div className="row-between small" style={{ padding: "10px 18px", borderTop: "1px solid var(--line)" }}>
-        {s.chat_id ? (
-          <span className="row" style={{ gap: 6, color: "var(--ok)" }}><Link2 size={14} /> Guruh ulangan</span>
-        ) : (
-          <span className="row" style={{ gap: 6, color: "var(--warn)" }}><Link2Off size={14} /> Guruhda <code>/ulash</code> yozing</span>
-        )}
-        {s.invite_link && <a href={s.invite_link} target="_blank" rel="noreferrer" className="row" style={{ gap: 4 }}>Havola <ExternalLink size={12} /></a>}
-      </div>
     </div>
   );
 }

@@ -159,6 +159,10 @@ function KaizenChart({ days, rules, target }) {
           </text>
         ))}
       </svg>
+      <p className="small muted" style={{ margin: "8px 2px 0" }}>
+        Erta turish birdan emas — har kuni atigi {rules.shift_minutes} daqiqa erta. Shuning uchun tanangiz qiynalmaydi:
+        {" "}{days[0].alarm_time} dan boshlab {target} ga silliq tushasiz.
+      </p>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.core.management import call_command
 from django.db.models import Count, Q
-from django.utils.html import format_html
 
 from apps.control.models import CampSettings
 
@@ -125,19 +124,13 @@ class MemberInline(admin.TabularInline):
 
 @admin.register(Squad)
 class SquadAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "members_count", "chat_status", "invite_link")
+    list_display = ("__str__", "members_count")
     list_filter = ("tribe__cohort", "tribe__gender")
     inlines = [MemberInline]
 
     @admin.display(description="A'zolar")
     def members_count(self, obj):
         return obj.memberships.filter(status=Membership.Status.ACTIVE).count()
-
-    @admin.display(description="Guruh")
-    def chat_status(self, obj):
-        if obj.telegram_chat_id:
-            return format_html('<span style="color:#16a34a">{}</span>', "✔ ulangan")
-        return format_html('<span style="color:#d97706">{}</span>', "ulanmagan — guruhda /ulash")
 
 
 # --- Ishtirokchi ----------------------------------------------------------------------
@@ -229,18 +222,32 @@ class MembershipAdmin(admin.ModelAdmin):
 
 @admin.register(DayRecord)
 class DayRecordAdmin(admin.ModelAdmin):
-    list_display = ("membership", "day_number", "date", "alarm_time", "woke_at", "voice_at", "video_status", "status")
-    list_filter = ("status", "date", "membership__cohort", "membership__squad")
+    list_display = ("membership", "day_number", "date", "alarm_time", "woke_at", "voice_at", "late", "video_status", "reviewed", "status")
+    list_filter = ("status", "voice_late", "date", "membership__cohort", "membership__squad")
     search_fields = ("membership__user__first_name", "membership__user__telegram_username")
     list_select_related = ("membership__user", "video")
     date_hierarchy = "date"
-    readonly_fields = ("membership", "date", "day_number", "phrase", "woke_at", "voice_at", "voice_file_id", "evaluated_at")
-    actions = ["excuse", "evaluate_now"]
+    readonly_fields = ("membership", "date", "day_number", "phrase", "woke_at", "voice_at", "voice_file_id",
+                       "voice_late", "admin_reviewed_at", "evaluated_at")
+    actions = ["mark_reviewed", "excuse", "evaluate_now"]
 
     @admin.display(description="Video")
     def video_status(self, obj):
         video = getattr(obj, "video", None)
         return video.get_status_display() if video else "—"
+
+    @admin.display(description="Kech", boolean=True)
+    def late(self, obj):
+        return obj.voice_late
+
+    @admin.display(description="Admin ko'rdi", boolean=True)
+    def reviewed(self, obj):
+        return bool(obj.admin_reviewed_at)
+
+    @admin.action(description="Admin tekshirdi deb belgilash (chatda hammaga ko'rinadi)")
+    def mark_reviewed(self, request, queryset):
+        n = sum(services.admin_review_report(r) for r in queryset)
+        self.message_user(request, f"{n} ta raport «Admin tekshirdi» deb belgilandi.")
 
     @admin.action(description="Uzrli deb belgilash (bajarildi + ogohlantirishni bekor qilish)")
     def excuse(self, request, queryset):

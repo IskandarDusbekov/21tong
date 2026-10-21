@@ -83,10 +83,9 @@ def ask_slot(slots):
 def approved(p):
     if not p.get("squad"):
         return t("approved_waiting")
-    invite = t("invite_link", link=p["invite_link"]) if p.get("invite_link") else t("invite_pending")
     return t("approved", name=escape(p.get("name", "")), cohort=escape(p["cohort"]), start_date=p["start_date"],
              days_left=p.get("days_left", ""), tribe=escape(p["tribe"]), squad=p["squad"],
-             alarm=p.get("alarm", ""), target=p.get("target", ""), invite=invite)
+             alarm=p.get("alarm", ""), target=p.get("target", ""))
 
 
 def practice(p):
@@ -128,10 +127,6 @@ def order(p, gender):
     return t("order_voice", **values)
 
 
-def squad_post(p):
-    return t("squad_post", icon="🎥" if p["proof_kind"] == "video" else "🎙", name=escape(p["name"]), day=p["day_number"])
-
-
 def review_request(p):
     return t("review_request", name=escape(p.get("name") or "Rotadosh"), day=p.get("day_number", ""),
              phrase=escape(p.get("phrase") or ""))
@@ -149,10 +144,6 @@ def strike(p):
     return t(key, count=p["count"], reason=reason(p["reason"]))
 
 
-def strike_public(p):
-    return t("strike_public", name=escape(p["name"]), count=p["count"], reason=reason(p["reason"]))
-
-
 def immunity_granted(source):
     return t(f"immunity_{source}") if source in ("referral", "sunday", "admin") else t("immunity_admin")
 
@@ -160,25 +151,6 @@ def immunity_granted(source):
 def award_caption(p):
     return t("award_caption", name=escape(p["name"]), stage=escape(p["stage"]), day=p["day"], rank=escape(p["rank"]),
              award=escape(p["award"]), description=escape(p.get("description") or ""), number=p["number"])
-
-
-# --- Rota guruhi --------------------------------------------------------------------
-
-ROLL_ICONS = {"done": "✅", "woke": "⏳", "absent": "❌", "frozen": "❄️", "rest": "😴", "out": "🚫"}
-ROLL_NOTES = {"woke": " — turdi, raport yo'q", "absent": " — javob yo'q", "frozen": " — muzlatilgan", "rest": " — yakshanba"}
-
-
-def roll_call(r):
-    lines = [t("roll_call_header", squad=r["squad"], day=r["day_number"]), ""]
-    for m in r["members"]:
-        if m["status"] == "out":
-            continue
-        warn = f" · ⚠️{m['strikes']}" if m["strikes"] else ""
-        lines.append(f"{ROLL_ICONS[m['status']]} {escape(m['name'])}{ROLL_NOTES.get(m['status'], '')}{warn}")
-    lines += ["", t("roll_call_footer", done=r["done"], total=r["total"])]
-    if r["total"] and r["done"] == r["total"]:
-        lines.append(t("roll_call_all_done"))
-    return "\n".join(lines)
 
 
 # --- Qo'mondonlik (faqat adminlar ko'radi — kodda qoladi) ----------------------------
@@ -196,11 +168,5 @@ def new_application(p, telegram_id):
     )
 
 
-def squad_linked(r):
-    return f"✅ Guruh <b>{r['name']}</b> ga ulandi ({escape(r['tribe'])}). Endi raportlar shu yerga keladi."
-
-
 NOT_ADMIN = "Bu buyruq faqat adminlar uchun."
 NO_PENDING = "Yangi ariza yo'q."
-LINK_HELP = "Bu buyruqni rota guruhining ichida yozing. Bot guruhda admin bo'lishi kerak."
-NO_SQUADS = "Ulanmagan rota yo'q. Avval arizalarni tasdiqlang — rotalar o'zi ochiladi."

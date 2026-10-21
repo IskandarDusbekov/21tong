@@ -20,7 +20,7 @@ class TongAdminSite(admin.AdminSite):
 def dashboard():
     from apps.accounts.models import User
     from apps.camp import services
-    from apps.camp.models import Cohort, DayRecord, Membership, Squad, Strike
+    from apps.camp.models import Cohort, DayRecord, Membership, Strike
     from apps.proofs.models import VideoProof
 
     today = services.local_now().date()
@@ -57,8 +57,6 @@ def dashboard():
              "value": Strike.objects.filter(created_at__date=today, revoked=False, cancelled_by_immunity=False).count(),
              "url": url("camp_strike_changelist"), "tone": "bad"},
         ],
-        "unlinked_squads": Squad.objects.filter(telegram_chat_id__isnull=True)
-        .exclude(tribe__cohort__status=Cohort.Status.FINISHED).count(),
         "links": [
             ("Lager sozlamalari", reverse("admin:control_campsettings_change", args=[1])),
             ("Bot xabarlari", url("control_botmessage_changelist")),
@@ -67,7 +65,6 @@ def dashboard():
             ("Ommaviy xabar yuborish", url("control_broadcast_add")),
             ("Yangi oqim ochish", url("camp_cohort_add")),
         ],
-        "squads_url": url("camp_squad_changelist", "telegram_chat_id__isnull=True"),
     }
 
 

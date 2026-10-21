@@ -20,6 +20,8 @@ class VideoProof(models.Model):
     status = models.CharField("Holati", max_length=16, choices=Status.choices, default=Status.REVIEWING)
     uploaded_at = models.DateTimeField("Yuborilgan", auto_now_add=True)
     decided_at = models.DateTimeField("Hal qilingan", null=True, blank=True)
+    # Qo'mondonlik videoni ko'zdan kechirsa — chatda "Admin tekshirdi" yozuvi hammaga ko'rinadi.
+    admin_reviewed_at = models.DateTimeField("Admin tekshirdi", null=True, blank=True)
 
     class Meta:
         verbose_name = "Video raport"

@@ -1,0 +1,18 @@
+[Unit]
+Description=21tong Telegram bot (aiogram)
+# Bot backend bilan ishlaydi — u ishga tushgach boshlanadi
+After=network.target 21tong-backend.service
+Wants=21tong-backend.service
+
+[Service]
+Type=simple
+# O'zgartiring: server foydalanuvchisi va loyiha yo'li
+User=ubuntu
+WorkingDirectory=/home/ubuntu/21tong/bot
+EnvironmentFile=/home/ubuntu/21tong/.env
+ExecStart=/home/ubuntu/21tong/venv/bin/python main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

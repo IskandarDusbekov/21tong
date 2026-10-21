@@ -106,20 +106,5 @@ class Backend:
     async def alarms(self, hhmm):
         return await self._json("GET", "/alarms/", params={"time": hhmm})
 
-    async def windows(self):
-        return await self._json("GET", "/windows/")
-
-    async def roll_call(self):
-        return await self._json("GET", "/roll-call/")
-
-    # --- rota guruhlari ---
-    async def squads(self, unlinked=False):
-        return await self._json("GET", "/squads/", params={"unlinked": 1} if unlinked else None)
-
-    async def link_squad(self, squad_id, chat_id, invite_link=""):
-        return await self._json(
-            "POST", f"/squads/{squad_id}/link/", json={"chat_id": chat_id, "invite_link": invite_link}
-        )
-
 
 backend = Backend()

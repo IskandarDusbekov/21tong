@@ -9,16 +9,21 @@ Mini App'dagi "Dev kirish" orqali istalgan demo foydalanuvchi sifatida kirib ko'
     python manage.py seed_demo --reset  # o'chirib, qaytadan yaratadi
 """
 import datetime as dt
+from io import BytesIO
 
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
+from PIL import Image, ImageDraw
 
 from apps.accounts.models import User
 from apps.camp import services
 from apps.camp.models import Award, Cohort, DayRecord, Immunity, Membership, Notification, Strike, WakeSlot
-from apps.community.models import Bounty, BountyCompletion, CoinTransaction, Reflection
+from apps.community.models import (
+    Bounty, BountyCompletion, CoinTransaction, PhotoChallenge, PhotoEntry, PhotoVote, Reflection, SquadMessage,
+)
 from apps.control.models import Stage
 
 COHORT_NAME = "Demo oqim"
@@ -113,6 +118,47 @@ class Command(BaseCommand):
                 record.voice_at = timezone.now()
                 record.voice_file_id = f"demo-{m.id}"
             record.save(update_fields=["woke_at", "phrase", "voice_at", "voice_file_id"])
+
+        # Rota chatida ko'rinishi uchun: bittasini admin tekshirgan, bittasi kech raport yuborgan
+        reviewed = services.ensure_day_record(members[1], today)
+        reviewed.admin_reviewed_at = timezone.now()
+        reviewed.save(update_fields=["admin_reviewed_at"])
+
+        late = services.ensure_day_record(members[6], today)
+        late.woke_at = timezone.now()
+        late.phrase = services.rules.random_phrase()
+        late.voice_at = timezone.now()
+        late.voice_file_id = f"demo-{members[6].id}"
+        late.voice_late = True
+        late.save(update_fields=["woke_at", "phrase", "voice_at", "voice_file_id", "voice_late"])
+
+        # Demo chat xabarlari (birinchi rota)
+        squad = members[0].squad
+        for m, text in (
+            (members[0], "Saf tayyor! Hammaga xayrli tong 💪"),
+            (members[1], "Bugun yengil yugurdim — kayfiyat zo'r."),
+            (members[2], "Erta turish endi osonroq bo'lyapti."),
+        ):
+            SquadMessage.objects.create(squad=squad, author=m, text=text)
+
+        # Tonggi rasm chelenji: bir nechta rasm va ovozlar
+        challenge = PhotoChallenge.objects.create(cohort=cohort, date=today, theme="Tong manzarasi")
+        palette = [(255, 122, 47), (108, 123, 255), (34, 178, 107), (224, 85, 154), (46, 179, 217)]
+        entries = []
+        for i, m in enumerate(members[:5]):
+            img = Image.new("RGB", (640, 640), palette[i % len(palette)])
+            draw = ImageDraw.Draw(img)
+            draw.ellipse((200, 120, 440, 360), fill=(255, 255, 255))
+            draw.text((60, 540), f"{m.user.first_name} — tong", fill=(255, 255, 255))
+            buf = BytesIO()
+            img.save(buf, "JPEG", quality=82)
+            entry = PhotoEntry.objects.create(challenge=challenge, membership=m)
+            entry.image.save(f"demo-{m.id}.jpg", ContentFile(buf.getvalue()), save=True)
+            entries.append(entry)
+        for voter in members[:7]:
+            for entry in entries:
+                if entry.membership_id != voter.id and (voter.id + entry.id) % 3:
+                    PhotoVote.objects.get_or_create(entry=entry, voter=voter)
 
         Immunity.objects.create(user=members[0].user, source=Immunity.Source.SUNDAY)
 

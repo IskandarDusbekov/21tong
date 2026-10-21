@@ -108,7 +108,6 @@ class DashboardView(PanelView):
                 for co in Cohort.objects.filter(status=Cohort.Status.RECRUITING)
             ],
             "squads": reports,
-            "unlinked_squads": sum(1 for r in reports if not r["chat_id"]),
             "events": [
                 {"id": n.id, "kind": n.kind, "label": n.get_kind_display(), "user": person(n.user),
                  "payload": n.payload, "at": n.created_at}
@@ -277,7 +276,7 @@ class SquadsView(PanelView):
         return Response([
             {
                 "id": s.id, "cohort": s.tribe.cohort.name, "gender": s.tribe.gender,
-                "invite_link": s.invite_link, **services.squad_report(s, today),
+                **services.squad_report(s, today),
             }
             for s in qs.order_by("tribe__cohort", "tribe__gender", "tribe__start_wake_time", "number")
         ])

@@ -1,5 +1,5 @@
 import {
-  AlertTriangle, ArrowRight, Award, CheckCircle2, Clock, Inbox, Link2Off, Shield, ShieldAlert, ShieldCheck,
+  AlertTriangle, ArrowRight, Award, CheckCircle2, Clock, Inbox, Shield, ShieldAlert, ShieldCheck,
   UserCheck, UserX, Users, Video,
 } from "lucide-react";
 import { api } from "../api.js";
@@ -101,7 +101,6 @@ function SquadMini({ s }) {
             style={{ width: 12, height: 12, borderRadius: 4, background: `var(--${{ done: "ok", woke: "warn", absent: "bad", frozen: "ice", rest: "info" }[m.status]})` }} />
         ))}
       </div>
-      {!s.chat_id && <div className="small" style={{ color: "var(--warn)", marginTop: 8 }}><Link2Off size={12} /> guruh ulanmagan</div>}
     </div>
   );
 }
@@ -193,13 +192,6 @@ export default function Dashboard({ onChange }) {
         <Kpi icon={Video} tone="info" value={k.videos_reviewing} label="Tekshiruvdagi videolar" to={["videos"]} />
         <Kpi icon={Clock} tone="mute" value={`${data.rules.voice_deadline} daq`} label="Raport muddati" to={["settings"]} />
       </div>
-
-      {data.unlinked_squads > 0 && (
-        <div className="alert tone-warn">
-          <Link2Off size={18} />
-          <div><b>{data.unlinked_squads} ta rotaning Telegram guruhi ulanmagan.</b> Guruh oching, botni admin qiling va guruhda <code>/ulash</code> yozing.</div>
-        </div>
-      )}
 
       <div className="grid grid-main">
         <div className="stack">

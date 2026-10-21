@@ -1,7 +1,30 @@
 from django.conf import settings
 from django.db import models
 
-from apps.camp.models import Cohort, Membership
+from apps.camp.models import Cohort, Membership, Squad
+
+
+class SquadMessage(models.Model):
+    """
+    Rota chati (Mini App ichida) — Telegram guruh o'rniga. Faqat matn xabarlari shu yerda saqlanadi;
+    raportlar, ogohlantirish va tonggi raport kabi voqealar chat lentasida jonli hisoblanadi.
+    Yozish faqat oyna ochiq bo'lganda (tong/kechqurun) — server tekshiradi.
+    """
+
+    squad = models.ForeignKey(Squad, on_delete=models.CASCADE, related_name="messages", verbose_name="Rota")
+    author = models.ForeignKey(Membership, null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name="messages", verbose_name="Muallif")
+    text = models.CharField("Matn", max_length=1000)
+    created_at = models.DateTimeField("Vaqt", auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [models.Index(fields=["squad", "created_at"])]
+        verbose_name = "Rota chati xabari"
+        verbose_name_plural = "Rota chati xabarlari"
+
+    def __str__(self):
+        return f"{self.author or 'tizim'}: {self.text[:30]}"
 
 
 class Reflection(models.Model):
@@ -71,6 +94,57 @@ class BountyCompletion(models.Model):
         ]
         verbose_name = "Bajarilgan topshiriq"
         verbose_name_plural = "Bajarilgan topshiriqlar"
+
+
+class PhotoChallenge(models.Model):
+    """Tonggi rasm chelenji — kunlik, oqim bo'yicha. Har kishi 2 tagacha rasm yuboradi, eng yaxshilari reytingga."""
+
+    cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name="photo_challenges", verbose_name="Oqim")
+    date = models.DateField("Sana")
+    title = models.CharField("Nomi", max_length=120, default="Tonggi rasm chelenji")
+    theme = models.CharField("Mavzu", max_length=200, blank=True,
+                             help_text="Masalan: «Tong manzarasi» yoki «Mashqdan keyin». Bo'sh bo'lsa — erkin.")
+    max_entries = models.PositiveSmallIntegerField("Har kishi nechta rasm", default=2)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["cohort", "date"], name="one_challenge_per_day")]
+        ordering = ["-date"]
+        verbose_name = "Rasm chelenji"
+        verbose_name_plural = "Rasm chelenjilari"
+
+    def __str__(self):
+        return f"{self.date}: {self.title}"
+
+
+class PhotoEntry(models.Model):
+    """Rasm chelenjiga yuborilgan bitta rasm."""
+
+    challenge = models.ForeignKey(PhotoChallenge, on_delete=models.CASCADE, related_name="entries", verbose_name="Chelenj")
+    membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="photo_entries",
+                                   verbose_name="Ishtirokchi")
+    image = models.ImageField("Rasm", upload_to="photos/%Y/%m/%d/")
+    created_at = models.DateTimeField("Yuborilgan", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Chelenj rasmi"
+        verbose_name_plural = "Chelenj rasmlari"
+
+    def __str__(self):
+        return f"{self.membership.user} — {self.challenge.date}"
+
+
+class PhotoVote(models.Model):
+    """Rasmga ovoz (🔥) — bir kishi bir rasmga bir marta, o'ziga emas."""
+
+    entry = models.ForeignKey(PhotoEntry, on_delete=models.CASCADE, related_name="votes", verbose_name="Rasm")
+    voter = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="photo_votes_given", verbose_name="Ovoz bergan")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["entry", "voter"], name="one_photo_vote_per_member")]
+        verbose_name = "Rasmga ovoz"
+        verbose_name_plural = "Rasmga ovozlar"
 
 
 class CoinTransaction(models.Model):

@@ -2,6 +2,7 @@ import datetime as dt
 import hashlib
 import hmac
 import json
+import tempfile
 import time
 from unittest import mock
 from urllib.parse import urlencode
@@ -262,12 +263,25 @@ class CampDisciplineTests(CampTestCase):
         with self.assertRaises(services.RuleError):
             services.record_voice(m, "v", at(DAY8, 6, 32))  # 8-kun — ovoz emas, video
 
-    def test_proof_deadline(self):
+    def test_on_time_voice_counts(self):
         m = self.make_member(1)
         services.press_wake(m, at(MONDAY, 7, 0))
-        with self.assertRaises(services.RuleError):
-            services.record_voice(m, "v", at(MONDAY, 7, 6))
-        services.record_voice(m, "v", at(MONDAY, 7, 4))
+        rec = services.record_voice(m, "v", at(MONDAY, 7, 4))
+        self.assertFalse(rec.voice_late)
+        services.evaluate_day(rec)
+        rec.refresh_from_db()
+        self.assertEqual(rec.status, "completed")
+
+    def test_late_voice_accepted_but_not_counted(self):
+        """Kech raport chatga tushadi (qabul qilinadi), lekin kun bajarilgan hisoblanmaydi."""
+        m = self.make_member(1)
+        services.press_wake(m, at(MONDAY, 7, 0))
+        rec = services.record_voice(m, "v", at(MONDAY, 7, 6))
+        self.assertTrue(rec.voice_late)
+        self.assertFalse(services.day_progress(rec)["proof_done"])
+        services.evaluate_day(rec)
+        rec.refresh_from_db()
+        self.assertEqual(rec.status, "failed")
 
     def test_application_notifies_admins_and_approval_joins_squad(self):
         user = services.register_user(
@@ -292,13 +306,87 @@ class CampDisciplineTests(CampTestCase):
         self.assertEqual(statuses, {1: "done", 2: "woke", 3: "absent"})
         self.assertEqual((report["done"], report["total"]), (1, 3))
 
-    def test_strike_announced_to_squad(self):
+    def test_strike_shows_in_squad_chat(self):
         m = self.make_member(1)
-        m.squad.telegram_chat_id = -100123
-        m.squad.save()
         services.evaluate_day(services.ensure_day_record(m, MONDAY))
-        n = Notification.objects.get(user=m.user, kind="strike")
-        self.assertEqual(n.payload["squad_chat_id"], -100123)
+        self.assertTrue(Notification.objects.filter(user=m.user, kind="strike").exists())
+        chat = community.squad_chat(m)
+        self.assertTrue(any(it["type"] == "strike" for it in chat["items"]))
+
+
+class ChatTests(CampTestCase):
+    def test_chat_post_only_in_window(self):
+        m = self.make_member(1)
+        with self.assertRaises(services.RuleError):
+            community.post_chat_message(m, "salom", at(MONDAY, 15))  # oyna yopiq
+        msg = community.post_chat_message(m, "salom", at(MONDAY, 21))  # kechki oyna ochiq
+        self.assertEqual(msg.text, "salom")
+        chat = community.squad_chat(m)  # created_at bugungi — jonli lentada ko'rinadi
+        self.assertTrue(any(it["type"] == "message" and it["text"] == "salom" for it in chat["items"]))
+
+    def test_chat_report_card_only_after_proof(self):
+        """Faqat uyg'ongan (raport yubormagan) odam chatda karta sifatida ko'rinmaydi — safda sanaladi."""
+        m = self.make_member(1)
+        services.press_wake(m, at(MONDAY, 7, 0))
+        chat = community.squad_chat(m, at(MONDAY, 8))
+        self.assertFalse(any(it["type"] == "report" for it in chat["items"]))
+        services.record_voice(m, "v", at(MONDAY, 7, 2))
+        chat = community.squad_chat(m, at(MONDAY, 8))
+        self.assertTrue(any(it["type"] == "report" for it in chat["items"]))
+
+    def test_admin_review_marks_report(self):
+        m = self.make_member(1)
+        rec = self.complete_morning(m, MONDAY)
+        self.assertTrue(services.admin_review_report(rec))
+        self.assertFalse(services.admin_review_report(rec))  # idempotent
+        rec.refresh_from_db()
+        self.assertTrue(services.day_progress(rec)["admin_reviewed"])
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class PhotoTests(CampTestCase):
+    def _img(self):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        buf = BytesIO()
+        Image.new("RGB", (8, 8), (10, 20, 30)).save(buf, "JPEG")
+        return SimpleUploadedFile("a.jpg", buf.getvalue(), "image/jpeg")
+
+    def test_upload_limit_and_vote(self):
+        from apps.community.models import PhotoEntry
+
+        a, b = self.make_member(1), self.make_member(2)
+        community.upload_photo(a, self._img())
+        community.upload_photo(a, self._img())
+        with self.assertRaises(services.RuleError):
+            community.upload_photo(a, self._img())  # 2 tadan oshmaydi
+
+        feed = community.photo_feed(b)
+        self.assertEqual(len(feed["entries"]), 2)
+        entry = PhotoEntry.objects.filter(membership=a).first()
+        self.assertTrue(community.vote_photo(b, entry))   # ovoz berildi
+        self.assertFalse(community.vote_photo(b, entry))  # qayta bosilsa — olinadi
+        with self.assertRaises(services.RuleError):
+            community.vote_photo(a, entry)  # o'ziga ovoz bermaydi
+
+    def test_photo_isolated_by_gender(self):
+        boy, girl = self.make_member(1, "M"), self.make_member(2, "F")
+        community.upload_photo(boy, self._img())
+        self.assertEqual(len(community.photo_feed(girl)["entries"]), 0)
+
+    def test_ranking_has_three_levels_and_votes_count(self):
+        a, b = self.make_member(1), self.make_member(2)
+        community.upload_photo(a, self._img())
+        entry = a.photo_entries.first()
+        community.vote_photo(b, entry)
+        r = community.ranking(a)
+        self.assertEqual(set(r), {"my_squad_name", "squad", "squads", "tribe_top"})
+        me = next(x for x in r["squad"] if x["me"])
+        self.assertEqual(me["votes"], 1)
+        self.assertGreaterEqual(me["points"], 5)  # 1 ovoz = 5 ball
 
 
 class CommunityTests(CampTestCase):

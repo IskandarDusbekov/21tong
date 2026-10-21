@@ -96,15 +96,12 @@ class Tribe(models.Model):
 
 class Squad(models.Model):
     """
-    Rota — qabila ichidagi kichik jamoa (standart 7 kishi). Har rotaning o'z yopiq Telegram guruhi bor:
-    raportlar, ogohlantirishlar va P2P tekshiruv birinchi navbatda rota ichida.
+    Rota — qabila ichidagi kichik jamoa (standart 7 kishi). Har rotaning Mini App ichida o'z chati bor:
+    raportlar, ogohlantirishlar va P2P tekshiruv birinchi navbatda rota ichida ko'rinadi.
     """
 
     tribe = models.ForeignKey(Tribe, on_delete=models.CASCADE, related_name="squads", verbose_name="Qabila")
     number = models.PositiveSmallIntegerField("Raqami")
-    telegram_chat_id = models.BigIntegerField("Telegram guruh ID", null=True, blank=True, unique=True,
-                                              help_text="Guruhda /ulash buyrug'i bilan avtomatik to'ldiriladi.")
-    invite_link = models.URLField("Guruhga kirish havolasi", blank=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["tribe", "number"], name="unique_squad_number")]
@@ -176,7 +173,12 @@ class DayRecord(models.Model):
     phrase = models.CharField("O'qiladigan gap", max_length=200, blank=True)
     voice_at = models.DateTimeField("Ovozli raport", null=True, blank=True)
     voice_file_id = models.CharField(max_length=255, blank=True)
+    # Kech kelgan raport ham qabul qilinadi (chatga tushadi), lekin kun bajarilgan hisoblanmaydi.
+    voice_late = models.BooleanField("Ovozli raport kech keldi", default=False)
     # Video talab qilinadigan kunlarda raport — proofs.VideoProof orqali
+
+    # Qo'mondonlik raportni ko'zdan kechirsa — chatda "Admin tekshirdi" yozuvi hammaga ko'rinadi.
+    admin_reviewed_at = models.DateTimeField("Admin tekshirdi", null=True, blank=True)
 
     status = models.CharField("Holati", max_length=16, choices=Status.choices, default=Status.PENDING)
     evaluated_at = models.DateTimeField("Baholangan", null=True, blank=True)

@@ -1,10 +1,24 @@
 // Umumiy UI bo'laklari: ma'lumot yuklash, toast, tasdiqlash oynasi, avatar, bo'sh holat.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Volume2, VolumeX } from "lucide-react";
 import { tg } from "./api.js";
+import { sound } from "./sound.js";
 
 export function haptic(type = "success") {
   tg?.HapticFeedback?.notificationOccurred(type);
+}
+
+/** Ovozsiz rejim tugmasi — doimiy, yuqori o'ng burchakda. */
+export function SoundToggle() {
+  const [muted, setMuted] = useState(sound.muted);
+  return (
+    <button
+      className="sound-toggle" aria-label={muted ? "Ovozni yoqish" : "Ovozni o'chirish"}
+      onClick={() => setMuted(sound.toggle())}
+    >
+      {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+    </button>
+  );
 }
 
 export function useLoad(fn) {
@@ -50,7 +64,7 @@ export function useAction(onDone) {
     setBusy(true);
     try {
       const result = await fn();
-      if (okText) toast(okText);
+      if (okText) { toast(okText); sound.success(); }
       onDone?.(result);
     } catch (e) {
       toast(e.message, "error");

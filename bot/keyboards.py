@@ -1,10 +1,29 @@
-from aiogram.types import InlineKeyboardButton as B, InlineKeyboardMarkup, WebAppInfo
+from aiogram.types import (
+    InlineKeyboardButton as B, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo,
+)
 
 import config
+
+# Pastki menyu tugmalari (ReplyKeyboard) — har biri aniq amal bajaradi
+BTN_STATUS = "☀️ Holatim"
+BTN_GUIDE = "📘 Yo'riqnoma"
+BTN_RULES = "📜 Nizom"
+BTN_REFERRAL = "👥 Do'st taklif"
 
 
 def _kb(*rows):
     return InlineKeyboardMarkup(inline_keyboard=[list(r) for r in rows])
+
+
+def main_menu():
+    """Doimiy pastki menyu — faqat qabul qilinganlarga ko'rsatiladi."""
+    rows = []
+    if config.MINI_APP_URL:
+        rows.append([KeyboardButton(text="📱 Mini App", web_app=WebAppInfo(url=config.MINI_APP_URL))])
+    rows.append([KeyboardButton(text=BTN_STATUS), KeyboardButton(text=BTN_GUIDE)])
+    rows.append([KeyboardButton(text=BTN_RULES), KeyboardButton(text=BTN_REFERRAL)])
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True, is_persistent=True,
+                               input_field_placeholder="Raportni ovozli xabar qilib yuboring")
 
 
 def gender():
@@ -44,10 +63,6 @@ def slots(items, prefix="slot"):
             label += f" · {s['title']}"
         rows.append([B(text=label, callback_data=f"{prefix}:{s['id']}")])
     return _kb(*rows)
-
-
-def squads(items):
-    return _kb(*[[B(text=f"{s['name']} · {s['tribe']}", callback_data=f"link:{s['id']}")] for s in items])
 
 
 def alarm():

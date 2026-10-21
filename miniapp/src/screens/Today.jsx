@@ -4,8 +4,23 @@ import {
   Moon, Send, ShieldCheck, Snowflake, Sun, Sunrise, Timer, Users, Video, XCircle,
 } from "lucide-react";
 import { api } from "../api.js";
-import { Avatar, Empty, ErrorCard, Sheet, Skeleton, useAction, useLoad } from "../ui.jsx";
+import { Avatar, Empty, ErrorCard, haptic, Sheet, Skeleton, useAction, useLoad } from "../ui.jsx";
+import { sound } from "../sound.js";
 import { stageIcon } from "./Journey.jsx";
+
+/** "Uyg'ondim" marosimi — quyosh portlashi, bir lahzaga to'liq ekran. */
+function WakeRitual() {
+  return (
+    <div className="ritual" role="status" aria-label="Xayrli tong">
+      <div className="ritual-sun">
+        <Sunrise size={64} />
+        <span className="ritual-rays" />
+      </div>
+      <b className="ritual-text">Xayrli tong, jangchi!</b>
+      <small>Bugun kechagidan kuchliroqsan</small>
+    </div>
+  );
+}
 
 function DayRing({ day, total }) {
   const r = 42;
@@ -285,7 +300,16 @@ function Upcoming({ u, me }) {
 
 export default function Today({ me, error, reload }) {
   const [askFreeze, setAskFreeze] = useState(false);
+  const [ritual, setRitual] = useState(false);
   const [run, busy] = useAction(reload);
+
+  const doWake = () => {
+    setRitual(true);
+    haptic("success");
+    sound.wake();
+    run(api.wake);
+    setTimeout(() => setRitual(false), 1900);
+  };
 
   if (error && !me) return <ErrorCard text={error} />;
   if (!me) return <div className="stack"><Skeleton height={190} /><Skeleton height={86} /><Skeleton height={230} /></div>;
@@ -298,6 +322,7 @@ export default function Today({ me, error, reload }) {
 
   return (
     <div>
+      {ritual && <WakeRitual />}
       <Hero me={me} />
       <Stats me={me} />
 
@@ -318,7 +343,7 @@ export default function Today({ me, error, reload }) {
           {t.woke && !t.proof_done && t.phrase && <OrderCard t={t} />}
           <Chain t={t} gender={me.gender} rules={me.journey.rules} />
           {!t.woke && (
-            <button className="btn btn-primary btn-xl btn-block" disabled={busy} onClick={() => run(api.wake, "Xayrli tong! Buyruqni bajaring.")}>
+            <button className="btn btn-primary btn-xl btn-block wake-btn" disabled={busy} onClick={doWake}>
               <Sun size={22} /> Uyg'ondim
             </button>
           )}

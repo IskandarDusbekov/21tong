@@ -22,9 +22,15 @@ class VideoProofAdmin(admin.ModelAdmin):
     list_display = ("day", "status", "votes", "uploaded_at", "decided_at")
     list_filter = ("status", "day__membership__cohort", "day__membership__squad")
     search_fields = ("day__membership__user__first_name", "day__membership__user__telegram_username")
-    readonly_fields = ("day", "telegram_file_id", "duration", "uploaded_at", "decided_at")
+    readonly_fields = ("day", "telegram_file_id", "duration", "uploaded_at", "decided_at", "admin_reviewed_at")
     inlines = [ReviewInline]
-    actions = ["approve", "reject"]
+    actions = ["mark_reviewed", "approve", "reject"]
+
+    @admin.action(description="Admin tekshirdi deb belgilash (chatda hammaga ko'rinadi)")
+    def mark_reviewed(self, request, queryset):
+        from apps.camp.services import admin_review_report
+        n = sum(admin_review_report(p.day) for p in queryset.select_related("day"))
+        self.message_user(request, f"{n} ta video «Admin tekshirdi» deb belgilandi.")
 
     @admin.display(description="Ovozlar (✔/✘/kutilmoqda)")
     def votes(self, obj):

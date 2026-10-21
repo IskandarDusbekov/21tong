@@ -1,9 +1,8 @@
 """
-Tonggi zanjir: "Uyg'ondim" -> BUYRUQ (o'qiladigan gap) -> raport botga (ovoz yoki video krujok)
--> rota guruhiga e'lon -> (video bo'lsa) 3 rotadosh tekshiradi.
+Tonggi zanjir: "Uyg'ondim" -> BUYRUQ (o'qiladigan gap) -> raport botga (ovoz yoki video krujok).
+Raport backend'ga yoziladi va Mini App ichidagi rota chatida paydo bo'ladi — rotadoshlar eshitadi/ko'radi.
 """
-from aiogram import Bot, F, Router
-from aiogram.exceptions import TelegramAPIError
+from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
 import texts
@@ -24,17 +23,6 @@ async def wake(call: CallbackQuery):
     await call.message.answer(texts.order(p, user and user.get("gender")))
 
 
-async def announce(bot: Bot, p, message: Message):
-    """Raportni rota guruhiga qayta joylaydi — hamma bir-birini ko'radi."""
-    if not p.get("squad_chat_id"):
-        return
-    try:
-        await bot.send_message(p["squad_chat_id"], texts.squad_post(p))
-        await bot.copy_message(p["squad_chat_id"], message.chat.id, message.message_id)
-    except TelegramAPIError:
-        pass  # guruh ulanmagan yoki bot admin emas — raport baribir qabul qilingan
-
-
 @router.message(F.chat.type == "private", F.voice)
 async def voice(message: Message):
     try:
@@ -46,7 +34,6 @@ async def voice(message: Message):
     if p.get("practice"):
         return await message.answer(texts.practice(p))
     await message.answer(texts.t("voice_ok", day=p["day_number"]))
-    await announce(message.bot, p, message)
 
 
 @router.message(F.chat.type == "private", F.video_note | F.video)
@@ -57,7 +44,6 @@ async def video(message: Message):
     except ApiError as e:
         return await message.answer(f"⛔ {e.detail}")
     await message.answer(texts.t("video_sent") if p["proof_status"] == "reviewing" else texts.t("voice_ok", day=p["day_number"]))
-    await announce(message.bot, p, message)
 
 
 @router.message(F.chat.type == "private", F.audio | F.photo | F.document)
