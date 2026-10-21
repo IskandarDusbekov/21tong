@@ -43,13 +43,14 @@ class MeView(AppView):
             "gender": user.gender,
             "status": user.status,
             "goal": user.goal,
-            "jokers": services.jokers_available(user),
+            "immunities": services.immunities_available(user),
             "coins": community.coin_balance(user),
             "membership": membership_summary(m),
             "today": today,
             "journey": journey,
             "stage": journey["stage"] if journey else None,
-            "max_strikes": rules.MAX_STRIKES,
+            "max_strikes": rules.current().max_strikes,
+            "reflection_max_length": rules.current().reflection_max_length,
         })
 
 

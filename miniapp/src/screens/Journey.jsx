@@ -1,15 +1,11 @@
 // "Yo'l" — 4 bosqich, 21 kunlik kalendar va Kaizen budilnik grafigi.
-import { BedDouble, Check, Crown, Mountain, Shield, Snowflake, Sprout, TrendingDown, X } from "lucide-react";
+import { BedDouble, Check, Crown, Flame, Medal, Mountain, Shield, Snowflake, Sprout, Star, TrendingDown, X } from "lucide-react";
 import { Empty, ErrorCard, Skeleton } from "../ui.jsx";
 
-export const STAGE_ICONS = { survivor: Sprout, adapted: Mountain, iron_will: Shield, mentor: Crown };
+// Bosqich ikonkalari admin panelda tanlanadi (control.Stage.icon)
+export const STAGE_ICONS = { sprout: Sprout, mountain: Mountain, shield: Shield, crown: Crown, flame: Flame, star: Star, medal: Medal };
+export const stageIcon = (s) => STAGE_ICONS[s?.icon] || Star;
 
-const STAGE_TEXT = {
-  survivor: "Tananing shoki ortda. Faqat vaqtida turish va ovozli xabar.",
-  adapted: "Budilnik har kuni −5 daqiqa suriladi, video isbot talab qilinadi.",
-  iron_will: "Qat'iy rejim. Odat shakllandi — endi bu sizning hayotingiz.",
-  mentor: "Eng kuchlilar. Keyingi oqimlarda yangilarni tekshirasiz va ustoz bo'lasiz.",
-};
 
 const WEEKDAYS = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"];
 
@@ -27,7 +23,7 @@ function NextStage({ j }) {
   }
   const prevDay = [...j.stages].reverse().find((s) => s.reached)?.day || 0;
   const pct = ((j.survived - prevDay) / (next.day - prevDay)) * 100;
-  const Icon = STAGE_ICONS[next.code];
+  const Icon = stageIcon(next);
   return (
     <div className="card">
       <div className="next-stage">
@@ -51,14 +47,14 @@ function Stages({ j }) {
   return (
     <ol className="stages card">
       {j.stages.map((s) => {
-        const Icon = STAGE_ICONS[s.code];
-        const isNext = j.next_stage?.code === s.code;
+        const Icon = stageIcon(s);
+        const isNext = j.next_stage?.day === s.day;
         return (
-          <li key={s.code} className={`stage ${s.reached ? "reached" : ""} ${isNext ? "next" : ""}`}>
+          <li key={s.day} className={`stage ${s.reached ? "reached" : ""} ${isNext ? "next" : ""}`}>
             <div className="stage-badge"><Icon size={20} /></div>
             <div className="stage-body">
               <b>{s.day}-kun · {s.name}</b>
-              <p>{STAGE_TEXT[s.code]}</p>
+              <p>{s.description}</p>
             </div>
           </li>
         );
@@ -90,7 +86,7 @@ function Calendar({ days }) {
       </div>
       <div className="legend">
         <span><i style={{ background: "var(--ok)" }} />Bajarildi</span>
-        <span><i style={{ background: "var(--bad)" }} />Strike</span>
+        <span><i style={{ background: "var(--bad)" }} />Ogohlantirish</span>
         <span><i style={{ background: "var(--rest)" }} />Yakshanba</span>
         <span><i style={{ background: "var(--ice)" }} />Muzlatilgan</span>
       </div>

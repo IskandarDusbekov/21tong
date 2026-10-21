@@ -11,6 +11,7 @@ from apps.accounts.manifest import render_manifest
 from apps.accounts.models import User
 from apps.camp import services
 from apps.camp.models import Cohort, DayRecord, Membership, Notification, Squad
+from apps.control.models import BotMessage, CampSettings
 from apps.proofs import services as proof_services
 from apps.proofs.models import Review
 
@@ -39,7 +40,7 @@ def user_payload(user):
         "gender": user.gender,
         "goal": user.goal,
         "referral_code": user.referral_code,
-        "jokers": services.jokers_available(user),
+        "immunities": services.immunities_available(user),
         "membership": membership_summary(membership),
     }
 
@@ -52,6 +53,17 @@ def proof_payload(membership, record):
         "squad": membership.squad.name if membership.squad_id else None,
         "squad_chat_id": membership.squad.telegram_chat_id if membership.squad_id else None,
     }
+
+
+class ConfigView(BotView):
+    """Admin paneldagi bot xabarlari va lager sozlamalari — bot ularni keshlab ishlatadi."""
+
+    def get(self, request):
+        c = CampSettings.load()
+        return Response({
+            "settings": {**c.template_vars(), "registration_open": c.registration_open},
+            "messages": dict(BotMessage.objects.values_list("key", "text")),
+        })
 
 
 # --- Ariza va admin -----------------------------------------------------------

@@ -5,8 +5,6 @@ from django.views.static import serve
 
 from apps.api.urls import app_patterns, bot_patterns
 
-admin.site.site_header = "21tong boshqaruvi"
-
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/bot/", include(bot_patterns)),

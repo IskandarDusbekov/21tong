@@ -4,6 +4,7 @@ from rest_framework import exceptions
 from rest_framework.views import exception_handler as drf_exception_handler
 from rest_framework.response import Response
 
+from apps.camp import services
 from apps.camp.services import RuleError
 
 
@@ -41,5 +42,5 @@ def membership_summary(membership):
         "target_wake_time": membership.target_wake_time.strftime("%H:%M"),
         "status": membership.status,
         "strikes": membership.active_strikes,
-        "freeze_used": hasattr(membership, "freeze"),
+        "freezes_left": services.freezes_left(membership),
     }

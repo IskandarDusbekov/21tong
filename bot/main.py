@@ -8,6 +8,7 @@ from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommand
 
 import config
 import tasks
+import texts
 from api import backend
 from handlers import routers
 
@@ -40,9 +41,10 @@ async def main():
     if not config.ADMIN_IDS:
         log.warning("ADMIN_IDS bo'sh — arizalar hech kimga bormaydi. .env ga Telegram ID'ingizni yozing.")
     try:
-        await backend.client.get("/")
-    except Exception:
-        raise SystemExit(f"Backend'ga ulanib bo'lmadi: {config.BACKEND_URL}. Avval runserver'ni ishga tushiring.")
+        await backend.config()
+    except Exception as e:
+        raise SystemExit(f"Backend'ga ulanib bo'lmadi ({config.BACKEND_URL}): {e}. Avval runserver'ni ishga tushiring.")
+    await texts.refresh(force=True)
 
     bot = Bot(config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()

@@ -22,8 +22,9 @@ def _least_loaded(qs, k):
     return candidates[:k]
 
 
-def pick_reviewers(membership: Membership, k=rules.REVIEWERS_PER_PROOF):
+def pick_reviewers(membership: Membership, k=None):
     """O'zidan boshqa, eng kam yuklangan k ta faol: avval rotadoshlar, keyin bir jinsdagi boshqalar."""
+    k = k or rules.current().reviewers_per_proof
     same_gender = Membership.objects.filter(
         cohort=membership.cohort,
         tribe__gender=membership.tribe.gender,
@@ -41,7 +42,7 @@ def submit_video(membership, telegram_file_id, duration=0, now=None):
     now = local_now(now)
     record = proof_record(membership, now)
     if not rules.video_required(record.day_number):
-        raise RuleError(f"Bugun video shart emas — gapni o'qib, ovozli xabar yuboring. Video {rules.VIDEO_REQUIRED_FROM_DAY}-kundan.")
+        raise RuleError(f"Bugun video shart emas — gapni o'qib, ovozli xabar yuboring. Video {rules.current().video_from_day}-kundan.")
     if hasattr(record, "video"):
         raise RuleError("Bugungi video allaqachon yuborilgan.")
 

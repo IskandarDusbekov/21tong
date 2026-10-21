@@ -13,6 +13,7 @@ backend/            Django + DRF — barcha biznes-qoidalar shu yerda
     services.py     Holatni o'zgartiruvchi yagona joy (bot ham, Mini App ham shu orqali)
   apps/proofs/      Video raport va P2P tekshiruv (avval rotadan, faqat bir jinsdagilar)
   apps/community/   Kechki refleksiya, 🔥, Bounty, IrodaCoin
+  apps/control/     Admin paneldan boshqariladigan sozlamalar, gaplar, bosqichlar, bot matnlari, ommaviy xabar
   apps/api/         /api/bot/* (X-Bot-Secret) va /api/app/* (Telegram initData)
 bot/                aiogram 3 — ariza, admin tasdig'i, buyruqlar, raportlar, budilnik, rota guruhlari
 miniapp/            React + Vite — Bugun / Yo'l / Lenta / Bounty / Reyting
@@ -20,6 +21,24 @@ miniapp/            React + Vite — Bugun / Yo'l / Lenta / Bounty / Reyting
 
 Bot hech qanday qoidani o'zi hal qilmaydi: u backend'ga so'rov yuboradi va `Notification` navbatidagi
 voqealarni (ariza, ogohlantirish, joker, tekshiruv...) Serjant/Murabbiy ohangida yetkazadi (`bot/texts.py`).
+
+## Admin panel — kod yozmasdan boshqarish
+
+http://localhost:8000/admin/ — bosh sahifada bugungi holat: yangi arizalar, raport berganlar, ogohlantirishlar,
+ulanmagan rota guruhlari va tezkor havolalar.
+
+| Bo'lim | Nima qilish mumkin |
+|---|---|
+| **Boshqaruv → Lager sozlamalari** | Barcha qoidalar: «Uyg'ondim» va raport muddatlari, budilnik qaysi kundan va necha daqiqaga suriladi, video qaysi kundan (0 — umuman yo'q), nechta ogohlantirishda chiqariladi, rota hajmi, yakshanba, Immunitet, muzlatish, ariza qabul qilish, yangi oqim uchun oynalar |
+| **Boshqaruv → Bot xabarlari** | Botning har bir xabar matni. Har sahifada ishlatish mumkin bo'lgan `{o'zgaruvchilar}` va standart matn ko'rsatiladi; noto'g'ri o'zgaruvchi saqlanmaydi; "Standartga qaytarish" amali bor. Bot o'zgarishni 30 soniyada oladi |
+| **Boshqaruv → O'qiladigan gaplar** | Uyg'ongach o'qiladigan gaplar ro'yxati (qo'shish, o'chirish, faol/nofaol) |
+| **Boshqaruv → Bosqichlar** | 3/7/21/40-kun bosqichlari: kun, nom, tavsif, ikonka |
+| **Boshqaruv → Ommaviy xabar** | Hammaga / oqimga / rotaga / faqat qizlar yoki yigitlarga xabar — saqlash bilan darhol yuboriladi |
+| **Foydalanuvchilar** | Arizalarni qabul qilish / rad etish, Immunitet berish |
+| **Lager → Oqimlar** | Oqim ochish, qabulni ochish, boshlash, yakunlash, kunlik jarayonni qo'lda ishga tushirish |
+| **Lager → Ishtirokchilar** | Immunitet berish, ogohlantirish berish, oxirgi ogohlantirishni bekor qilish, chiqarish, qaytarish, Mentor qilish, rotasini o'zgartirish |
+| **Lager → Kunlik yozuvlar** | Kunni uzrli deb belgilash (ogohlantirish ham bekor bo'ladi), qo'lda baholash |
+| **Raportlar → Video raportlar** | Videoni qo'lda tasdiqlash / rad etish |
 
 ## Lager qanday ishlaydi
 
@@ -31,14 +50,18 @@ Qabul qilinsa va qabul ochiq oqim bo'lsa, foydalanuvchi o'zi qabila va **7 kishi
 
 1. Budilnik vaqtida bot `TURISH!` xabarini **«☀️ Uyg'ondim»** tugmasi bilan yuboradi (Mini App'da ham bor).
 2. Bosilgach bot **BUYRUQ** beradi: bugungi tasodifiy gap (har kuni har kimga boshqa — eski yozuvni qayta yuborib bo'lmaydi).
-3. Raport **botga** (shaxsiy chatga), budilnikdan keyin 30 daqiqa ichida yuboriladi:
-   - **1–6 kun** — gapni o'qigan ovozli xabar;
-   - **7-kundan** — tashqarida, kamera ko'chaga qaragan, gapni o'qigan **video krujok**.
-     Uni rotadan 3 kishi gap bilan solishtirib tekshiradi, 2 tasi tasdiqlasa — qabul.
-4. Raport rota guruhiga avtomatik e'lon qilinadi. Tonggi oyna yopilganda guruhga **TONGGI RAPORT** chiqadi:
+3. Gap o'qilgan **ovozli raport botga** (shaxsiy chatga), budilnikdan keyin **5 daqiqa** ichida yuboriladi.
+   Admin panelda video yoqilsa (masalan 7-kundan) — o'sha kundan tashqarida yozilgan video krujok so'raladi,
+   uni rotadan 3 kishi gap bilan solishtirib tekshiradi.
+4. Budilnik **3-kundan** boshlab har kuni 5 daqiqaga oldinga suriladi — maqsad vaqtigacha.
+5. Raport rota guruhiga avtomatik e'lon qilinadi. Tonggi oyna yopilganda guruhga **TONGGI RAPORT** chiqadi:
    kim safda, kim turib raport bermadi, kim umuman yo'q.
 
 **Jazo.** Bajarmaslik — ogohlantirish (rota guruhiga ham e'lon qilinadi). 3 ta — lagerdan chiqariladi va guruhdan haydaladi.
+**Immunitet** (avvalgi "Joker") keyingi ogohlantirishni o'chiradi: yakshanba barvaqt turganlarga, do'st taklif qilganlarga
+yoki qo'mondonlik tomonidan beriladi.
+
+Yuqoridagi barcha raqamlar standart qiymatlar — admin panelda o'zgartiriladi.
 
 ## Konsepsiya → kod
 
@@ -47,28 +70,28 @@ Qabul qilinsa va qabul ochiq oqim bo'lsa, foydalanuvchi o'zi qabila va **7 kishi
 | Jins birinchi so'raladi, keyin o'zgarmaydi | `services.register_user` |
 | Ariza va admin tasdig'i (Telegram'da) | `bot/handlers/onboarding.py`, `bot/handlers/admin.py`, `services.approve_user` |
 | 7 kishilik rota | `rules.SQUAD_SIZE`, `services.assign_squad` |
-| Manifest + do'st taklifi → 1 Joker | `accounts/manifest.py`; Joker do'st **tasdiqlanganda** beriladi |
+| Manifest + do'st taklifi → 1 Immunitet | `accounts/manifest.py`; Joker do'st **tasdiqlanganda** beriladi |
 | Gender-izolyatsiya | Qabila `(oqim, jins, vaqt)`; rota guruhiga kirish faqat so'rov orqali, bot tekshiradi |
 | Kaizen −5 daqiqa | `rules.alarm_time_for_day` |
 | Uyg'ondim → gap → raport | `services.press_wake`, `record_voice`, `proofs.submit_video` |
 | 3 tadan 2 tasi tasdiqlasa | `proofs.services.cast_vote`, `rules.approval_threshold` |
 | Oynalar 05:30–07:30, 20:30–21:30 | `Cohort` maydonlari; bot rota chatini qulflaydi/ochadi |
 | Tonggi raport | `services.squad_report`, `bot/tasks.py` |
-| 3 Strike = Out, Joker strike'ni o'chiradi | `services.issue_strike` |
-| Yakshanba: strike yo'q, bajarsa Joker | `services.evaluate_day` |
+| 3 ogohlantirish = chiqarish, Immunitet o'chiradi | `services.issue_strike` |
+| Yakshanba: ogohlantirish yo'q, bajarsa Immunitet | `services.evaluate_day` |
 | Muzlatish: 1 marta, faqat kechqurun ertangi kun uchun | `services.request_freeze` |
-| Bosqichlar 3/7/21/40 | `rules.STAGES` |
+| Bosqichlar 3/7/21/40 | Admin → Bosqichlar (`control.Stage`) |
+| Barcha raqamlar | Admin → Lager sozlamalari (`control.CampSettings`), `camp/rules.py` |
 
-### Tasdiqlash kerak bo'lgan qarorlar
+### Standart qarorlar (admin panelda o'zgaradi)
 
-Konsepsiyada aniq bo'lmagan joylarda quyidagicha qaror qilindi — hammasi `backend/apps/camp/rules.py` da bitta qatorda o'zgaradi:
-
-- **Video va −5 daqiqa 7-kundan** boshlanadi (1–6 kunlar: ovozli raport).
-- **"Vaqtida turish"** — budilnikdan keyin 5 daqiqa ichida «Uyg'ondim»; **raport** — 30 daqiqa ichida.
-- **Joker** keyingi strike'da avtomatik ishlatiladi ("tasodifiy" emas).
-- **Kun oxirigacha ovoz berilmagan video** — tasdiqlangan deb hisoblanadi.
-- **Muzlatish** 18:00 dan keyin bosiladi.
-- **Referral Joker** do'st havola orqali kelib, admin tasdiqlaganda beriladi.
+- «Uyg'ondim» — budilnikdan keyin **5 daqiqa**, ovozli raport — **5 daqiqa** ichida.
+- Budilnik **3-kundan** har kuni **5 daqiqaga** suriladi.
+- Video raport **o'chiq** (har kuni ovozli raport).
+- **Immunitet** keyingi ogohlantirishda avtomatik ishlatiladi.
+- Kun oxirigacha hech kim ovoz bermagan video — tasdiqlangan hisoblanadi.
+- Muzlatish oqimda **1 marta**, **18:00** dan keyin.
+- Do'st taklifi uchun Immunitet do'st admin tomonidan qabul qilinganda beriladi.
 
 ## Lokal ishga tushirish
 

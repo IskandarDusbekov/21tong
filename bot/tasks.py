@@ -41,34 +41,37 @@ async def deliver(bot: Bot, n):
     elif kind == "approved":
         await bot.send_message(tg, texts.approved(p))
     elif kind == "rejected":
-        await bot.send_message(tg, texts.REJECTED)
+        await bot.send_message(tg, texts.t("rejected"))
     elif kind == "review_request":
         await bot.send_video_note(tg, p["file_id"])
         await bot.send_message(tg, texts.review_request(p), reply_markup=keyboards.review(p["review_id"]))
     elif kind == "video_approved":
-        await bot.send_message(tg, texts.VIDEO_APPROVED.format(day=p["day_number"]))
+        await bot.send_message(tg, texts.t("video_approved", day=p["day_number"]))
     elif kind == "video_rejected":
-        await bot.send_message(tg, texts.VIDEO_REJECTED)
+        await bot.send_message(tg, texts.t("video_rejected"))
     elif kind == "strike":
         await bot.send_message(tg, texts.strike(p))
         if squad_chat:
             await safe_send(bot, squad_chat, texts.strike_public(p))
-    elif kind == "joker_used":
-        await bot.send_message(tg, texts.JOKER_USED.format(reason=texts.STRIKE_REASONS.get(p["reason"], "")))
-    elif kind == "joker_granted":
-        await bot.send_message(tg, texts.JOKER_GRANTED.get(p.get("source"), "🃏 Sizga Joker berildi!"))
+    elif kind == "immunity_used":
+        await bot.send_message(tg, texts.t("immunity_used", reason=texts.reason(p["reason"])))
+    elif kind == "immunity_granted":
+        await bot.send_message(tg, texts.immunity_granted(p.get("source")))
     elif kind == "expelled":
-        await bot.send_message(tg, texts.EXPELLED)
+        await bot.send_message(tg, texts.t("expelled"))
         if squad_chat:
-            await safe_send(bot, squad_chat, texts.expelled_public(p))
+            await safe_send(bot, squad_chat, texts.t("expelled_public", name=texts.escape(p["name"])))
             await bot.ban_chat_member(squad_chat, tg)
             await bot.unban_chat_member(squad_chat, tg, only_if_banned=True)
     elif kind == "stage_up":
         await bot.send_message(tg, texts.stage_up(p))
+    elif kind == "broadcast":
+        await bot.send_message(tg, p["text"])
 
 
 async def notifications_loop(bot: Bot, interval=5):
     while True:
+        await texts.refresh()  # admin panelda o'zgargan matnlar 30 soniyada yetib keladi
         try:
             items = await backend.notifications()
             done = []
@@ -101,8 +104,7 @@ async def minute_loop(bot: Bot):
 
 async def send_alarms(bot: Bot, hhmm):
     for a in await backend.alarms(hhmm):
-        text = f"{texts.alarm(a['day_number'], hhmm)}\n\n{texts.ALARM_HINT}"
-        await safe_send(bot, a["telegram_id"], text, reply_markup=keyboards.alarm())
+        await safe_send(bot, a["telegram_id"], texts.alarm(a["day_number"], hhmm), reply_markup=keyboards.alarm())
 
 
 async def send_roll_calls(bot: Bot, hhmm):
@@ -130,10 +132,10 @@ async def sync_windows(bot: Bot, hhmm, state):
             if current == "closed":
                 await bot.set_chat_permissions(chat, LOCKED)
                 if chat in state:
-                    await bot.send_message(chat, texts.CHAT_CLOSED)
+                    await bot.send_message(chat, texts.t("chat_closed"))
             else:
                 await bot.set_chat_permissions(chat, OPEN)
-                await bot.send_message(chat, texts.CHAT_OPEN[current])
+                await bot.send_message(chat, texts.t(f"chat_open_{current}"))
             state[chat] = current
         except TelegramAPIError as e:
             log.warning("Chat %s oynasini o'zgartirib bo'lmadi (bot admin emasmi?): %s", chat, e)

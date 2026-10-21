@@ -3,7 +3,6 @@ Lagerning asosiy biznes-logikasi. Bot ham, Mini App ham faqat shu funksiyalar or
 holatni o'zgartiradi — qoidalar bir joyda.
 """
 import datetime as dt
-import random
 from dataclasses import dataclass
 
 from django.db import transaction
@@ -13,7 +12,7 @@ from django.utils import timezone
 from apps.accounts.models import Gender, User
 
 from . import rules
-from .models import Cohort, DayRecord, Freeze, Joker, Membership, Notification, Squad, Strike, Tribe
+from .models import Cohort, DayRecord, Freeze, Immunity, Membership, Notification, Squad, Strike, Tribe
 
 
 class RuleError(Exception):
@@ -36,6 +35,8 @@ def register_user(*, telegram_id, gender, goal, username="", first_name="", refe
     """Botdagi ariza yakunlanganda chaqiriladi. Jins keyin o'zgarmaydi. Adminlarga xabar ketadi."""
     if gender not in Gender.values:
         raise RuleError("Jins noto'g'ri ko'rsatilgan.")
+    if not rules.current().registration_open and not User.objects.filter(telegram_id=telegram_id).exists():
+        raise RuleError("Hozircha ariza qabul qilinmayapti.")
     if current_wake_time and target_wake_time and target_wake_time > current_wake_time:
         raise RuleError("Maqsad vaqti hozirgi vaqtdan kech bo'lmasin — biz erta turishga o'rganamiz.")
     user, created = User.objects.get_or_create(
@@ -81,7 +82,7 @@ def application_payload(user):
 def approve_user(user):
     """
     Admin tasdiqlaydi. Qabul ochiq oqim bo'lsa, arizadagi vaqtlar bilan darhol
-    qabila va rotaga joylashtiriladi. Taklif qilgan do'stga (bir marta) Joker beriladi.
+    qabila va rotaga joylashtiriladi. Taklif qilgan do'stga (bir marta) Immunitet beriladi.
     """
     if user.status != User.Status.PENDING:
         return False
@@ -106,15 +107,20 @@ def approve_user(user):
             }
     notify(user, Notification.Kind.APPROVED, **payload)
 
-    # Shartli UPDATE — parallel tasdiqlarda ham Joker faqat bir marta beriladi
-    granted = User.objects.filter(pk=user.referred_by_id, referral_joker_granted=False).update(
-        referral_joker_granted=True
-    )
-    if granted:
-        referrer = User.objects.get(pk=user.referred_by_id)
-        Joker.objects.create(user=referrer, source=Joker.Source.REFERRAL)
-        notify(referrer, Notification.Kind.JOKER_GRANTED, source="referral", friend=str(user))
+    # Shartli UPDATE — parallel tasdiqlarda ham Immunitet faqat bir marta beriladi
+    if user.referred_by_id and rules.current().referral_immunity:
+        granted = User.objects.filter(pk=user.referred_by_id, referral_immunity_granted=False).update(
+            referral_immunity_granted=True
+        )
+        if granted:
+            grant_immunity(User.objects.get(pk=user.referred_by_id), Immunity.Source.REFERRAL)
     return True
+
+
+def grant_immunity(user, source):
+    immunity = Immunity.objects.create(user=user, source=source)
+    notify(user, Notification.Kind.IMMUNITY_GRANTED, source=source)
+    return immunity
 
 
 def reject_user(user):
@@ -153,7 +159,7 @@ def assign_squad(tribe):
         .order_by("number")
     )
     for squad in squads:
-        if squad.size < rules.SQUAD_SIZE:
+        if squad.size < rules.current().squad_size:
             return squad
     last = max((s.number for s in squads), default=0)
     return Squad.objects.create(tribe=tribe, number=last + 1)
@@ -177,7 +183,7 @@ def ensure_day_record(membership: Membership, date: dt.date):
     record, _ = DayRecord.objects.get_or_create(
         membership=membership, date=date, defaults={"day_number": day_number, "alarm_time": alarm}
     )
-    if record.status == DayRecord.Status.PENDING and hasattr(membership, "freeze") and membership.freeze.date == date:
+    if record.status == DayRecord.Status.PENDING and membership.freezes.filter(date=date).exists():
         record.status = DayRecord.Status.FROZEN
         record.save(update_fields=["status"])
     return record
@@ -203,7 +209,7 @@ def press_wake(membership, now=None):
     if now < earliest - dt.timedelta(hours=1):
         raise RuleError("Hali juda erta. Budilnik vaqtiga yaqin bosing.")
     record.woke_at = now
-    record.phrase = random.choice(rules.PHRASES)
+    record.phrase = rules.random_phrase()
     record.save(update_fields=["woke_at", "phrase"])
     return record
 
@@ -213,20 +219,21 @@ def proof_record(membership, now):
     record = _today_record(membership, now)
     if not record.woke_at:
         raise RuleError("Avval «Uyg'ondim» tugmasini bosing — keyin o'qiladigan gap beriladi.")
-    if now > rules.proof_deadline(record.date, record.alarm_time, now.tzinfo):
+    if now > rules.proof_deadline(record.date, record.alarm_time, now.tzinfo, record.day_number):
         raise RuleError(
-            f"Kechikding. Raport budilnikdan keyin {rules.PROOF_DEADLINE_MINUTES} daqiqa ichida yuborilishi kerak edi."
+            f"Kechikding. Raport budilnikdan keyin {rules.proof_minutes(record.day_number)} daqiqa ichida "
+            "yuborilishi kerak edi."
         )
     return record
 
 
 def record_voice(membership, file_id="", now=None):
-    """2-qadam (1–6 kunlar): gap o'qilgan ovozli raport — botga shaxsiy yuboriladi."""
+    """Ovozli raport: bot bergan gap o'qilgan voice — botga shaxsiy yuboriladi."""
     now = local_now(now)
     record = proof_record(membership, now)
     if rules.video_required(record.day_number):
         raise RuleError(
-            f"{rules.VIDEO_REQUIRED_FROM_DAY}-kundan boshlab ovoz emas — tashqarida yozilgan video krujok kerak."
+            f"{rules.current().video_from_day}-kundan boshlab ovoz emas — tashqarida yozilgan video krujok kerak."
         )
     if record.voice_at:
         raise RuleError("Bugungi ovozli raport allaqachon qabul qilingan.")
@@ -237,13 +244,14 @@ def record_voice(membership, file_id="", now=None):
 
 
 def proof_kind(day_number):
-    return "video" if rules.video_required(day_number) else "voice"
+    return rules.proof_kind(day_number)
 
 
 def day_progress(record: DayRecord):
     video = getattr(record, "video", None)
     tz = timezone.get_current_timezone()
     kind = proof_kind(record.day_number)
+    deadline = rules.proof_deadline(record.date, record.alarm_time, tz, record.day_number)
     return {
         "date": record.date.isoformat(),
         "day_number": record.day_number,
@@ -252,7 +260,8 @@ def day_progress(record: DayRecord):
         "woke": bool(record.woke_at),
         "phrase": record.phrase,
         "proof_kind": kind,
-        "proof_deadline": timezone.localtime(rules.proof_deadline(record.date, record.alarm_time, tz)).strftime("%H:%M"),
+        "proof_deadline": timezone.localtime(deadline).strftime("%H:%M"),
+        "proof_minutes": rules.proof_minutes(record.day_number),
         "voice": bool(record.voice_at),
         "video_required": kind == "video",
         "video": video.status if video else None,
@@ -272,6 +281,7 @@ def journey(membership, now=None):
     records = {r.day_number: r for r in membership.days.all()}
     start, target = membership.tribe.start_wake_time, membership.target_wake_time
 
+    c = rules.current()
     days = []
     for n in range(1, cohort.duration_days + 1):
         date = cohort.start_date + dt.timedelta(days=n - 1)
@@ -286,14 +296,11 @@ def journey(membership, now=None):
             "weekday": date.weekday(),
             "status": status,
             "today": date == now.date(),
-            "alarm_time": (record.alarm_time if record else rules.alarm_time_for_day(start, target, n)).strftime("%H:%M"),
-            "video_required": rules.video_required(n),
+            "alarm_time": (record.alarm_time if record else rules.alarm_time_for_day(start, target, n, c)).strftime("%H:%M"),
+            "video_required": rules.video_required(n, c),
         })
 
-    stages = [
-        {"code": code, "name": name, "day": day, "reached": survived >= day}
-        for day, code, name in rules.STAGES
-    ]
+    stages = [{**s, "reached": survived >= s["day"]} for s in rules.stages()]
     next_stage = next((s for s in stages if not s["reached"]), None)
 
     def window(start_t, end_t):
@@ -308,7 +315,7 @@ def journey(membership, now=None):
         "survived": survived,
         "current_day": cohort.day_number(now.date()),
         "duration": cohort.duration_days,
-        "stage": rules.stage_for(survived),
+        "stage": rules.stage_for(survived, stages),
         "next_stage": next_stage,
         "stages": stages,
         "days": days,
@@ -317,55 +324,93 @@ def journey(membership, now=None):
             "evening": window(cohort.evening_window_start, cohort.evening_window_end),
         },
         "tomorrow_alarm": (
-            rules.alarm_time_for_day(start, target, tomorrow_number).strftime("%H:%M") if tomorrow_number else None
+            rules.alarm_time_for_day(start, target, tomorrow_number, c).strftime("%H:%M") if tomorrow_number else None
         ),
         "rules": {
-            "shift_from_day": rules.SHIFT_FROM_DAY,
-            "video_from_day": rules.VIDEO_REQUIRED_FROM_DAY,
-            "shift_minutes": rules.SHIFT_STEP_MINUTES,
-            "grace_minutes": rules.WAKE_GRACE_MINUTES,
-            "proof_deadline_minutes": rules.PROOF_DEADLINE_MINUTES,
-            "max_strikes": rules.MAX_STRIKES,
-            "squad_size": rules.SQUAD_SIZE,
+            "shift_from_day": c.shift_from_day,
+            "video_from_day": c.video_from_day,
+            "shift_minutes": c.shift_step_minutes,
+            "grace_minutes": c.wake_grace_minutes,
+            "voice_deadline_minutes": c.voice_deadline_minutes,
+            "video_deadline_minutes": c.video_deadline_minutes,
+            "max_strikes": c.max_strikes,
+            "squad_size": c.squad_size,
+            "freezes_left": freezes_left(membership, c),
         },
     }
 
 
-# --- Strike / Joker -----------------------------------------------------------
+# --- Ogohlantirish / Immunitet ---------------------------------------------------
 
 @dataclass
 class StrikeResult:
     strike: Strike
-    joker_used: bool
+    immunity_used: bool
     expelled: bool
 
 
-@transaction.atomic
-def issue_strike(membership, reason, day=None):
-    strike = Strike.objects.create(membership=membership, reason=reason, day=day)
-    joker = Joker.objects.select_for_update().filter(user=membership.user, used_on__isnull=True).first()
-    if joker:
-        joker.used_on = strike
-        joker.save(update_fields=["used_on"])
-        strike.cancelled_by_joker = True
-        strike.save(update_fields=["cancelled_by_joker"])
-        notify(membership.user, Notification.Kind.JOKER_USED, reason=reason)
-        return StrikeResult(strike, joker_used=True, expelled=False)
-
-    count = membership.active_strikes
-    # Rota guruhiga ham e'lon qilinadi — lagerda hamma bir-biri uchun javobgar
-    squad = {
+def _squad_payload(membership):
+    """Rota guruhiga ham e'lon qilinadi — lagerda hamma bir-biri uchun javobgar."""
+    return {
         "name": membership.user.first_name or str(membership.user),
         "squad_chat_id": membership.squad.telegram_chat_id if membership.squad_id else None,
     }
-    notify(membership.user, Notification.Kind.STRIKE, reason=reason, count=count, max=rules.MAX_STRIKES, **squad)
-    if count >= rules.MAX_STRIKES:
-        membership.status = Membership.Status.EXPELLED
-        membership.left_at = timezone.now()
-        membership.save(update_fields=["status", "left_at"])
-        notify(membership.user, Notification.Kind.EXPELLED, **squad)
-        return StrikeResult(strike, joker_used=False, expelled=True)
-    return StrikeResult(strike, joker_used=False, expelled=False)
+
+
+@transaction.atomic
+def issue_strike(membership, reason, day=None, use_immunity=True):
+    strike = Strike.objects.create(membership=membership, reason=reason, day=day)
+    immunity = (
+        Immunity.objects.select_for_update().filter(user=membership.user, used_on__isnull=True).first()
+        if use_immunity else None
+    )
+    if immunity:
+        immunity.used_on = strike
+        immunity.save(update_fields=["used_on"])
+        strike.cancelled_by_immunity = True
+        strike.save(update_fields=["cancelled_by_immunity"])
+        notify(membership.user, Notification.Kind.IMMUNITY_USED, reason=reason)
+        return StrikeResult(strike, immunity_used=True, expelled=False)
+
+    max_strikes = rules.current().max_strikes
+    count = membership.active_strikes
+    squad = _squad_payload(membership)
+    notify(membership.user, Notification.Kind.STRIKE, reason=reason, count=count, max=max_strikes, **squad)
+    if count >= max_strikes:
+        expel(membership)
+        return StrikeResult(strike, immunity_used=False, expelled=True)
+    return StrikeResult(strike, immunity_used=False, expelled=False)
+
+
+def expel(membership, notify_user=True):
+    membership.status = Membership.Status.EXPELLED
+    membership.left_at = timezone.now()
+    membership.save(update_fields=["status", "left_at"])
+    if notify_user:
+        notify(membership.user, Notification.Kind.EXPELLED, **_squad_payload(membership))
+
+
+def restore(membership):
+    """Admin: chiqarilgan ishtirokchini qaytarish."""
+    membership.status = Membership.Status.ACTIVE
+    membership.left_at = None
+    membership.save(update_fields=["status", "left_at"])
+
+
+def revoke_strike(strike):
+    """Admin: ogohlantirishni bekor qilish (sanoqdan chiqadi)."""
+    if not strike.revoked:
+        strike.revoked = True
+        strike.save(update_fields=["revoked"])
+
+
+def excuse_day(record):
+    """Admin: kunni uzrli deb bajarilgan qilish va shu kun uchun berilgan ogohlantirishni bekor qilish."""
+    record.status = DayRecord.Status.COMPLETED
+    record.evaluated_at = record.evaluated_at or timezone.now()
+    record.save(update_fields=["status", "evaluated_at"])
+    for strike in record.strikes.filter(revoked=False):
+        revoke_strike(strike)
 
 
 def _failure_reason(record: DayRecord, tz):
@@ -376,15 +421,17 @@ def _failure_reason(record: DayRecord, tz):
     video = getattr(record, "video", None)
     if video is None:
         return Strike.Reason.NO_VIDEO
-    # Jamoa ovoz bermay qolgan video — foyda ishtirokchi tomonida (tasdiqlangan deb hisoblanadi)
     if video.status == video.Status.REJECTED:
+        return Strike.Reason.REJECTED
+    # Hech kim ovoz bermagan video: sozlamaga qarab tasdiqlangan yoki rad etilgan hisoblanadi
+    if video.status == video.Status.REVIEWING and not rules.current().unreviewed_counts_as_approved:
         return Strike.Reason.REJECTED
     return None
 
 
 @transaction.atomic
 def evaluate_day(record: DayRecord):
-    """Kun yakunida chaqiriladi: Strike, Joker va bosqichni hal qiladi. Idempotent."""
+    """Kun yakunida chaqiriladi: ogohlantirish, Immunitet va bosqichni hal qiladi. Idempotent."""
     record = DayRecord.objects.select_for_update().select_related("membership__cohort", "membership__user").get(pk=record.pk)
     membership = record.membership
     if record.status != DayRecord.Status.PENDING or membership.status != Membership.Status.ACTIVE:
@@ -395,8 +442,8 @@ def evaluate_day(record: DayRecord):
     if rules.is_rest_day(record.date):
         if reason is None:
             record.status = DayRecord.Status.COMPLETED
-            Joker.objects.create(user=membership.user, source=Joker.Source.SUNDAY)
-            notify(membership.user, Notification.Kind.JOKER_GRANTED, source="sunday")
+            if rules.current().sunday_immunity:
+                grant_immunity(membership.user, Immunity.Source.SUNDAY)
         else:
             record.status = DayRecord.Status.REST
     elif reason is None:
@@ -419,21 +466,29 @@ def evaluate_day(record: DayRecord):
 
 # --- Fors-major ---------------------------------------------------------------
 
+def freezes_left(membership, c=None):
+    c = c or rules.current()
+    return max(c.freezes_per_cohort - membership.freezes.count(), 0)
+
+
 def request_freeze(membership, reason="", now=None):
-    """Kasallik: butun oqimda 1 marta, faqat kechqurun ertangi kun uchun."""
+    """Kasallik: oqimda sozlamadagi soncha, faqat kechqurun ertangi kun uchun."""
     now = local_now(now)
-    if Freeze.objects.filter(membership=membership).exists():
-        raise RuleError("Muzlatish imkoniyatidan allaqachon foydalangansiz.")
-    if now.time() < rules.FREEZE_ALLOWED_FROM:
-        raise RuleError(f"Muzlatishni faqat kechqurun ({rules.FREEZE_ALLOWED_FROM:%H:%M} dan keyin) oldindan bosish mumkin.")
+    c = rules.current()
+    if freezes_left(membership, c) <= 0:
+        raise RuleError("Muzlatish imkoniyatidan to'liq foydalangansiz.")
+    if now.time() < c.freeze_allowed_from:
+        raise RuleError(f"Muzlatishni faqat kechqurun ({c.freeze_allowed_from:%H:%M} dan keyin) oldindan bosish mumkin.")
     tomorrow = now.date() + dt.timedelta(days=1)
     if membership.cohort.day_number(tomorrow) is None:
         raise RuleError("Ertangi kun oqimga kirmaydi.")
+    if membership.freezes.filter(date=tomorrow).exists():
+        raise RuleError("Ertangi kun allaqachon muzlatilgan.")
     return Freeze.objects.create(membership=membership, date=tomorrow, reason=reason[:200])
 
 
-def jokers_available(user):
-    return Joker.objects.filter(user=user, used_on__isnull=True).count()
+def immunities_available(user):
+    return Immunity.objects.filter(user=user, used_on__isnull=True).count()
 
 
 # --- Rota raporti ---------------------------------------------------------------

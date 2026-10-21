@@ -14,21 +14,23 @@ class Cohort(models.Model):
         RUNNING = "running", "Davom etmoqda"
         FINISHED = "finished", "Yakunlangan"
 
-    name = models.CharField(max_length=100)
-    start_date = models.DateField()
-    duration_days = models.PositiveSmallIntegerField(default=21)
-    status = models.CharField(max_length=16, choices=Status.choices, default=Status.RECRUITING)
+    name = models.CharField("Nomi", max_length=100)
+    start_date = models.DateField("Boshlanish sanasi")
+    duration_days = models.PositiveSmallIntegerField("Davomiyligi (kun)", default=21)
+    status = models.CharField("Holati", max_length=16, choices=Status.choices, default=Status.RECRUITING)
 
-    # "Oyna" usuli: chatlar faqat shu oraliqlarda ochiq
-    morning_window_start = models.TimeField(default=dt.time(5, 30))
-    morning_window_end = models.TimeField(default=dt.time(7, 30))
-    evening_window_start = models.TimeField(default=dt.time(20, 30))
-    evening_window_end = models.TimeField(default=dt.time(21, 30))
+    # "Oyna" usuli: rota chatlari faqat shu oraliqlarda ochiq
+    morning_window_start = models.TimeField("Tonggi oyna: boshlanishi", default=dt.time(5, 30))
+    morning_window_end = models.TimeField("Tonggi oyna: tugashi", default=dt.time(7, 30))
+    evening_window_start = models.TimeField("Kechki oyna: boshlanishi", default=dt.time(20, 30))
+    evening_window_end = models.TimeField("Kechki oyna: tugashi", default=dt.time(21, 30))
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField("Yaratilgan", auto_now_add=True)
 
     class Meta:
         ordering = ["-start_date"]
+        verbose_name = "Oqim"
+        verbose_name_plural = "Oqimlar"
 
     def __str__(self):
         return self.name
@@ -45,13 +47,13 @@ class Cohort(models.Model):
 
 class Tribe(models.Model):
     """
-    Qabila — bir xil boshlang'ich uyg'onish vaqtidagi, bir jinsdagi ishtirokchilar guruhi.
-    Masalan: "7:00 Qabilasi (Yigitlar)". Har biri alohida Telegram guruhiga bog'lanadi.
+    Qabila — bir xil boshlang'ich uyg'onish vaqtidagi, bir jinsdagi ishtirokchilar.
+    Masalan: "7:00 Qabilasi (Yigitlar)". Ichida 7 kishilik rotalar bo'ladi.
     """
 
-    cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name="tribes")
-    gender = models.CharField(max_length=1, choices=Gender.choices)
-    start_wake_time = models.TimeField()
+    cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name="tribes", verbose_name="Oqim")
+    gender = models.CharField("Jins", max_length=1, choices=Gender.choices)
+    start_wake_time = models.TimeField("Boshlang'ich uyg'onish vaqti")
 
     class Meta:
         constraints = [
@@ -60,6 +62,8 @@ class Tribe(models.Model):
             )
         ]
         ordering = ["start_wake_time", "gender"]
+        verbose_name = "Qabila"
+        verbose_name_plural = "Qabilalar"
 
     def __str__(self):
         return f"{self.start_wake_time:%H:%M} Qabilasi ({self.get_gender_display()}lar)"
@@ -67,18 +71,21 @@ class Tribe(models.Model):
 
 class Squad(models.Model):
     """
-    Rota — qabila ichidagi 7 kishilik jamoa. Har rotaning o'z yopiq Telegram guruhi bor:
+    Rota — qabila ichidagi kichik jamoa (standart 7 kishi). Har rotaning o'z yopiq Telegram guruhi bor:
     raportlar, ogohlantirishlar va P2P tekshiruv birinchi navbatda rota ichida.
     """
 
-    tribe = models.ForeignKey(Tribe, on_delete=models.CASCADE, related_name="squads")
-    number = models.PositiveSmallIntegerField()
-    telegram_chat_id = models.BigIntegerField(null=True, blank=True, unique=True)
-    invite_link = models.URLField(blank=True)
+    tribe = models.ForeignKey(Tribe, on_delete=models.CASCADE, related_name="squads", verbose_name="Qabila")
+    number = models.PositiveSmallIntegerField("Raqami")
+    telegram_chat_id = models.BigIntegerField("Telegram guruh ID", null=True, blank=True, unique=True,
+                                              help_text="Guruhda /ulash buyrug'i bilan avtomatik to'ldiriladi.")
+    invite_link = models.URLField("Guruhga kirish havolasi", blank=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["tribe", "number"], name="unique_squad_number")]
         ordering = ["tribe", "number"]
+        verbose_name = "Rota"
+        verbose_name_plural = "Rotalar"
 
     def __str__(self):
         return f"{self.number}-rota · {self.tribe}"
@@ -93,34 +100,38 @@ class Membership(models.Model):
 
     class Status(models.TextChoices):
         ACTIVE = "active", "Faol"
-        EXPELLED = "expelled", "Haydalgan (3 strike)"
-        FINISHED = "finished", "21 kunni tugatgan"
-        MENTOR = "mentor", "Mentor (40 kun)"
+        EXPELLED = "expelled", "Chiqarilgan"
+        FINISHED = "finished", "Oqimni tugatgan"
+        MENTOR = "mentor", "Mentor"
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships")
-    cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name="memberships")
-    tribe = models.ForeignKey(Tribe, on_delete=models.PROTECT, related_name="memberships")
-    squad = models.ForeignKey(Squad, null=True, blank=True, on_delete=models.SET_NULL, related_name="memberships")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships",
+                             verbose_name="Foydalanuvchi")
+    cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name="memberships", verbose_name="Oqim")
+    tribe = models.ForeignKey(Tribe, on_delete=models.PROTECT, related_name="memberships", verbose_name="Qabila")
+    squad = models.ForeignKey(Squad, null=True, blank=True, on_delete=models.SET_NULL, related_name="memberships",
+                              verbose_name="Rota")
     target_wake_time = models.TimeField("Maqsad qilingan uyg'onish vaqti")
-    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
-    joined_at = models.DateTimeField(auto_now_add=True)
-    left_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField("Holati", max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    joined_at = models.DateTimeField("Qo'shilgan", auto_now_add=True)
+    left_at = models.DateTimeField("Chiqqan", null=True, blank=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["user", "cohort"], name="one_membership_per_cohort")
         ]
+        verbose_name = "Ishtirokchi"
+        verbose_name_plural = "Ishtirokchilar"
 
     def __str__(self):
         return f"{self.user} @ {self.cohort}"
 
     @property
     def active_strikes(self):
-        return self.strikes.filter(cancelled_by_joker=False).count()
+        return self.strikes.filter(cancelled_by_immunity=False, revoked=False).count()
 
 
 class DayRecord(models.Model):
-    """Ishtirokchining bitta kundagi holati: budilnik vaqti va 3 qadamli zanjir."""
+    """Ishtirokchining bitta kundagi holati: budilnik vaqti, uyg'onish va raport."""
 
     class Status(models.TextChoices):
         PENDING = "pending", "Kutilmoqda"
@@ -129,66 +140,83 @@ class DayRecord(models.Model):
         REST = "rest", "Yakshanba dam olish"
         FROZEN = "frozen", "Muzlatilgan"
 
-    membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="days")
-    date = models.DateField()
-    day_number = models.PositiveSmallIntegerField()
-    alarm_time = models.TimeField()
+    membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="days", verbose_name="Ishtirokchi")
+    date = models.DateField("Sana")
+    day_number = models.PositiveSmallIntegerField("Kun")
+    alarm_time = models.TimeField("Budilnik")
 
-    woke_at = models.DateTimeField(null=True, blank=True)  # 1-qadam: "Uyg'ondim"
+    woke_at = models.DateTimeField("Uyg'ondi", null=True, blank=True)
     # Uyg'ongach beriladigan, ovoz chiqarib o'qiladigan gap. Har kuni har kimga tasodifiy —
     # eski yozuvni qayta yuborib aldab bo'lmaydi, tekshiruvchilar gapni solishtiradi.
-    phrase = models.CharField(max_length=200, blank=True)
-    # 2-qadam, 1–6 kunlar: gap o'qilgan ovozli raport (botga)
-    voice_at = models.DateTimeField(null=True, blank=True)
+    phrase = models.CharField("O'qiladigan gap", max_length=200, blank=True)
+    voice_at = models.DateTimeField("Ovozli raport", null=True, blank=True)
     voice_file_id = models.CharField(max_length=255, blank=True)
-    # 2-qadam, 7-kundan: tashqarida yozilgan video krujok — proofs.VideoProof orqali
+    # Video talab qilinadigan kunlarda raport — proofs.VideoProof orqali
 
-    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
-    evaluated_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField("Holati", max_length=16, choices=Status.choices, default=Status.PENDING)
+    evaluated_at = models.DateTimeField("Baholangan", null=True, blank=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["membership", "date"], name="one_record_per_day")
         ]
         ordering = ["date"]
+        verbose_name = "Kunlik yozuv"
+        verbose_name_plural = "Kunlik yozuvlar"
 
     def __str__(self):
         return f"{self.membership.user} — {self.day_number}-kun ({self.date})"
 
 
 class Strike(models.Model):
+    """Ogohlantirish."""
+
     class Reason(models.TextChoices):
         LATE = "late", "Vaqtida turmadi"
-        NO_VOICE = "no_voice", "Ovozli xabar yubormadi"
-        NO_VIDEO = "no_video", "Video yubormadi"
-        REJECTED = "rejected", "Jamoa tasdiqlamadi"
-        ADMIN = "admin", "Admin qarori"
+        NO_VOICE = "no_voice", "Ovozli raport yo'q"
+        NO_VIDEO = "no_video", "Video raport yo'q"
+        REJECTED = "rejected", "Rota tasdiqlamadi"
+        ADMIN = "admin", "Qo'mondonlik qarori"
 
-    membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="strikes")
-    day = models.ForeignKey(DayRecord, null=True, blank=True, on_delete=models.SET_NULL, related_name="strikes")
-    reason = models.CharField(max_length=16, choices=Reason.choices)
-    cancelled_by_joker = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="strikes", verbose_name="Ishtirokchi")
+    day = models.ForeignKey(DayRecord, null=True, blank=True, on_delete=models.SET_NULL, related_name="strikes",
+                            verbose_name="Kun")
+    reason = models.CharField("Sabab", max_length=16, choices=Reason.choices)
+    cancelled_by_immunity = models.BooleanField("Immunitet bilan o'chirildi", default=False)
+    revoked = models.BooleanField("Admin bekor qildi", default=False)
+    created_at = models.DateTimeField("Berilgan", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Ogohlantirish"
+        verbose_name_plural = "Ogohlantirishlar"
+        ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Strike: {self.membership.user} ({self.get_reason_display()})"
+        return f"{self.membership.user} — {self.get_reason_display()}"
 
 
-class Joker(models.Model):
-    """Immunitet: kelajakdagi 1 ta Strike'ni o'chiradi. Foydalanuvchiga tegishli (oqimlar orasida saqlanadi)."""
+class Immunity(models.Model):
+    """Immunitet: keyingi 1 ta ogohlantirishni o'chiradi. Foydalanuvchiga tegishli (oqimlar orasida saqlanadi)."""
 
     class Source(models.TextChoices):
-        REFERRAL = "referral", "Manifest + taklif"
+        REFERRAL = "referral", "Do'st taklifi"
         SUNDAY = "sunday", "Yakshanba barvaqt turish"
-        ADMIN = "admin", "Admin sovg'asi"
+        ADMIN = "admin", "Qo'mondonlik"
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="jokers")
-    source = models.CharField(max_length=16, choices=Source.choices)
-    granted_at = models.DateTimeField(auto_now_add=True)
-    used_on = models.OneToOneField(Strike, null=True, blank=True, on_delete=models.SET_NULL, related_name="joker")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="immunities",
+                             verbose_name="Foydalanuvchi")
+    source = models.CharField("Manba", max_length=16, choices=Source.choices)
+    granted_at = models.DateTimeField("Berilgan", auto_now_add=True)
+    used_on = models.OneToOneField(Strike, null=True, blank=True, on_delete=models.SET_NULL, related_name="immunity",
+                                   verbose_name="Qaysi ogohlantirishga ishlatildi")
+
+    class Meta:
+        verbose_name = "Immunitet"
+        verbose_name_plural = "Immunitetlar"
+        ordering = ["-granted_at"]
 
     def __str__(self):
-        return f"Joker ({self.get_source_display()}) — {self.user}"
+        return f"Immunitet ({self.get_source_display()}) — {self.user}"
 
 
 class Notification(models.Model):
@@ -204,30 +232,38 @@ class Notification(models.Model):
         REVIEW_REQUEST = "review_request", "Videoni tekshirish so'rovi"
         VIDEO_APPROVED = "video_approved", "Video tasdiqlandi"
         VIDEO_REJECTED = "video_rejected", "Video rad etildi"
-        STRIKE = "strike", "Strike"
-        JOKER_USED = "joker_used", "Joker ishlatildi"
-        JOKER_GRANTED = "joker_granted", "Joker berildi"
-        EXPELLED = "expelled", "Haydaldi"
+        STRIKE = "strike", "Ogohlantirish"
+        IMMUNITY_USED = "immunity_used", "Immunitet ishlatildi"
+        IMMUNITY_GRANTED = "immunity_granted", "Immunitet berildi"
+        EXPELLED = "expelled", "Chiqarildi"
         STAGE_UP = "stage_up", "Yangi bosqich"
+        BROADCAST = "broadcast", "Ommaviy xabar"
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
-    kind = models.CharField(max_length=32, choices=Kind.choices)
-    payload = models.JSONField(default=dict, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    sent_at = models.DateTimeField(null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications",
+                             verbose_name="Kimga")
+    kind = models.CharField("Turi", max_length=32, choices=Kind.choices)
+    payload = models.JSONField("Ma'lumot", default=dict, blank=True)
+    created_at = models.DateTimeField("Yaratilgan", auto_now_add=True)
+    sent_at = models.DateTimeField("Yuborilgan", null=True, blank=True)
 
     class Meta:
         ordering = ["created_at"]
         indexes = [models.Index(fields=["sent_at", "created_at"])]
+        verbose_name = "Bot xabari navbati"
+        verbose_name_plural = "Bot xabarlari navbati"
 
 
 class Freeze(models.Model):
-    """Fors-major: butun oqimda 1 marta, faqat kechqurun ertangi kun uchun bosiladi."""
+    """Fors-major (kasallik): oqimda sozlamadagi soncha, faqat kechqurun ertangi kun uchun bosiladi."""
 
-    membership = models.OneToOneField(Membership, on_delete=models.CASCADE, related_name="freeze")
+    membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="freezes", verbose_name="Ishtirokchi")
     date = models.DateField("Muzlatilgan kun")
-    reason = models.CharField(max_length=200, blank=True)
-    requested_at = models.DateTimeField(auto_now_add=True)
+    reason = models.CharField("Sabab", max_length=200, blank=True)
+    requested_at = models.DateTimeField("So'ralgan", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Muzlatish (kasallik)"
+        verbose_name_plural = "Muzlatishlar (kasallik)"
 
     def __str__(self):
-        return f"Freeze: {self.membership.user} — {self.date}"
+        return f"{self.membership.user} — {self.date}"

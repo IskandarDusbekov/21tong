@@ -15,12 +15,11 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.camp import services
-from apps.camp.models import Cohort, DayRecord, Joker, Membership, Strike
+from apps.camp.models import Cohort, DayRecord, Immunity, Membership, Strike
 from apps.community.models import Bounty, BountyCompletion, CoinTransaction, Reflection
-from apps.proofs.models import VideoProof
 
 COHORT_NAME = "Demo oqim"
-DAYS_PASSED = 7  # bugun 8-kun bo'ladi: budilnik allaqachon surilgan, video talab qilinadi
+DAYS_PASSED = 7  # bugun 8-kun bo'ladi: budilnik 3-kundan beri surilmoqda
 
 # 9 yigit -> 1-rota (7 kishi) + 2-rota (2 kishi)
 BOYS = [
@@ -87,19 +86,17 @@ class Command(BaseCommand):
                 record.save(update_fields=["status"])
             services.ensure_day_record(m, today)
 
-        # Bugungi raport turlicha bo'lsin: kimdir video yuborgan, kimdir faqat turgan, kimdir hali yo'q
+        # Bugungi raport turlicha bo'lsin: kimdir ovozli raport yuborgan, kimdir faqat turgan, kimdir hali yo'q
         for i, m in enumerate(members[1:6], start=1):
             record = services.ensure_day_record(m, today)
             record.woke_at = timezone.now()
-            record.phrase = services.rules.PHRASES[i % len(services.rules.PHRASES)]
-            record.save(update_fields=["woke_at", "phrase"])
+            record.phrase = services.rules.random_phrase()
             if i <= 3:
-                VideoProof.objects.create(
-                    day=record, telegram_file_id=f"demo-{m.id}", duration=10,
-                    status=VideoProof.Status.APPROVED if i < 3 else VideoProof.Status.REVIEWING,
-                )
+                record.voice_at = timezone.now()
+                record.voice_file_id = f"demo-{m.id}"
+            record.save(update_fields=["woke_at", "phrase", "voice_at", "voice_file_id"])
 
-        Joker.objects.create(user=members[0].user, source=Joker.Source.SUNDAY)
+        Immunity.objects.create(user=members[0].user, source=Immunity.Source.SUNDAY)
 
         reading = Bounty.objects.create(cohort=cohort, date=today, title="20 bet kitob o'qish", reward=10)
         Bounty.objects.create(

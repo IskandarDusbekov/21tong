@@ -3,6 +3,7 @@ from django.urls import path
 from . import bot, miniapp
 
 bot_patterns = [
+    path("config/", bot.ConfigView.as_view()),
     path("users/register/", bot.RegisterView.as_view()),
     path("users/pending/", bot.PendingApplicationsView.as_view()),
     path("users/<int:telegram_id>/", bot.UserView.as_view()),

@@ -1,53 +1,18 @@
 """
-Lager qoidalari — sof funksiyalar (DB ga tegmaydi), shuning uchun oson test qilinadi.
+Lager qoidalari. Barcha raqamlar admin paneldagi "Lager sozlamalari"dan (control.CampSettings)
+olinadi — qoidani o'zgartirish uchun kod yozish shart emas.
 
-Konsepsiyadan olingan raqamlar shu yerda jamlangan; qoidani o'zgartirish
-kerak bo'lsa, faqat shu faylni tahrirlash kifoya.
+Funksiyalar ixtiyoriy `c` (sozlamalar) parametrini oladi; berilmasa joriy sozlamalar ishlatiladi.
 """
 import datetime as dt
+import random
 
-# Kaizen: har kuni budilnik shuncha daqiqaga oldinga suriladi
-SHIFT_STEP_MINUTES = 5
-# "7-kun (Moslashgan)": -5 daqiqalik qisqarish va video isbot shu kundan boshlanadi
-SHIFT_FROM_DAY = 7
-VIDEO_REQUIRED_FROM_DAY = 7
-# "Uyg'ondim" tugmasini budilnikdan keyin shuncha daqiqa ichida bosish kerak
-WAKE_GRACE_MINUTES = 5
-# Raport (ovoz yoki video) budilnikdan keyin shuncha daqiqa ichida yuborilishi shart
-PROOF_DEADLINE_MINUTES = 30
-# 3 Strikes = Out
-MAX_STRIKES = 3
-# Har rotada nechta odam
-SQUAD_SIZE = 7
-# P2P tekshiruv: nechta tekshiruvchi
-REVIEWERS_PER_PROOF = 3
-# Muzlatishni faqat shu vaqtdan keyin (kechqurun) ertangi kun uchun bosish mumkin
-FREEZE_ALLOWED_FROM = dt.time(18, 0)
-REFLECTION_MAX_LENGTH = 200
+from apps.control import defaults
+from apps.control.models import CampSettings, Phrase, Stage
 
-# Uyg'ongach ovoz chiqarib o'qiladigan gaplar (kognitiv uyg'otish + raportni soxtalashtirishdan himoya)
-PHRASES = [
-    "Men bugun o'z irodamning xo'jayiniman.",
-    "Intizom — bu o'zimga bergan va'damni bajarish.",
-    "Har bir erta tong — kelajagimga qo'yilgan sarmoya.",
-    "Qiyinchilik vaqtinchalik, odat esa umrbod qoladi.",
-    "Ko'rpa meni yengolmaydi. Men turdim va harakatdaman.",
-    "Bugun kechagidan bir qadam kuchliroqman.",
-    "Bahona emas, natija. Men uyg'oqman va tayyorman.",
-    "Erta turgan yutadi. Bugun men yutaman.",
-    "O'zgarish bugun, aynan shu daqiqada boshlanadi.",
-    "Men rotamni tushirib qo'ymayman. Men shu yerdaman.",
-    "Uyqum emas, maqsadim meni boshqaradi.",
-    "Har tong — yangi imkoniyat. Uni qo'ldan bermayman.",
-]
 
-STAGES = [
-    # (shu kunni tugatgach, kod, nom)
-    (3, "survivor", "Omon qolgan"),
-    (7, "adapted", "Moslashgan"),
-    (21, "iron_will", "Temir Iroda"),
-    (40, "mentor", "Yengilmas / Mentor"),
-]
+def current():
+    return CampSettings.load()
 
 
 def _to_minutes(t: dt.time) -> int:
@@ -58,40 +23,46 @@ def _from_minutes(m: int) -> dt.time:
     return dt.time(m // 60, m % 60)
 
 
-def alarm_time_for_day(start: dt.time, target: dt.time, day_number: int) -> dt.time:
+def alarm_time_for_day(start: dt.time, target: dt.time, day_number: int, c=None) -> dt.time:
     """
-    Kaizen "silliq o'tish": SHIFT_FROM_DAY dan boshlab har kuni -5 daqiqa,
+    Kaizen "silliq o'tish": shift_from_day dan boshlab har kuni −shift_step daqiqa,
     maqsad vaqtga yetgach to'xtaydi.
-
-    >>> alarm_time_for_day(dt.time(7, 0), dt.time(5, 30), 6)
-    datetime.time(7, 0)
-    >>> alarm_time_for_day(dt.time(7, 0), dt.time(5, 30), 7)
-    datetime.time(6, 55)
-    >>> alarm_time_for_day(dt.time(7, 0), dt.time(5, 30), 40)
-    datetime.time(5, 30)
     """
+    c = c or current()
     start_m, target_m = _to_minutes(start), _to_minutes(target)
-    if target_m >= start_m or day_number < SHIFT_FROM_DAY:
+    if target_m >= start_m or day_number < c.shift_from_day:
         return start
-    shifted = start_m - SHIFT_STEP_MINUTES * (day_number - SHIFT_FROM_DAY + 1)
+    shifted = start_m - c.shift_step_minutes * (day_number - c.shift_from_day + 1)
     return _from_minutes(max(shifted, target_m))
 
 
-def video_required(day_number: int) -> bool:
-    return day_number >= VIDEO_REQUIRED_FROM_DAY
+def video_required(day_number: int, c=None) -> bool:
+    c = c or current()
+    return bool(c.video_from_day) and day_number >= c.video_from_day
 
 
-def wake_deadline(date: dt.date, alarm: dt.time, tz) -> dt.datetime:
-    return dt.datetime.combine(date, alarm, tzinfo=tz) + dt.timedelta(minutes=WAKE_GRACE_MINUTES)
+def proof_kind(day_number: int, c=None) -> str:
+    return "video" if video_required(day_number, c) else "voice"
 
 
-def proof_deadline(date: dt.date, alarm: dt.time, tz) -> dt.datetime:
-    return dt.datetime.combine(date, alarm, tzinfo=tz) + dt.timedelta(minutes=PROOF_DEADLINE_MINUTES)
+def wake_deadline(date: dt.date, alarm: dt.time, tz, c=None) -> dt.datetime:
+    c = c or current()
+    return dt.datetime.combine(date, alarm, tzinfo=tz) + dt.timedelta(minutes=c.wake_grace_minutes)
 
 
-def is_rest_day(date: dt.date) -> bool:
-    """Yakshanba — uxlash mumkin, Strike berilmaydi."""
-    return date.weekday() == 6
+def proof_minutes(day_number: int, c=None) -> int:
+    c = c or current()
+    return c.video_deadline_minutes if video_required(day_number, c) else c.voice_deadline_minutes
+
+
+def proof_deadline(date: dt.date, alarm: dt.time, tz, day_number: int, c=None) -> dt.datetime:
+    return dt.datetime.combine(date, alarm, tzinfo=tz) + dt.timedelta(minutes=proof_minutes(day_number, c))
+
+
+def is_rest_day(date: dt.date, c=None) -> bool:
+    """Yakshanba — uxlash mumkin, ogohlantirish berilmaydi (sozlamada o'chirilishi mumkin)."""
+    c = c or current()
+    return c.sunday_rest and date.weekday() == 6
 
 
 def approval_threshold(assigned: int) -> int:
@@ -99,13 +70,25 @@ def approval_threshold(assigned: int) -> int:
     return assigned // 2 + 1 if assigned else 0
 
 
-def stage_for(completed_days: int):
+def stages():
+    return [
+        {"code": s.icon, "name": s.name, "day": s.day, "description": s.description, "icon": s.icon}
+        for s in Stage.objects.all()
+    ]
+
+
+def stage_for(completed_days: int, all_stages=None):
     """Tugatilgan kunlar soniga ko'ra erishilgan eng yuqori bosqich (yoki None)."""
     reached = None
-    for days, code, name in STAGES:
-        if completed_days >= days:
-            reached = {"code": code, "name": name, "day": days}
+    for s in all_stages if all_stages is not None else stages():
+        if completed_days >= s["day"]:
+            reached = s
     return reached
+
+
+def random_phrase() -> str:
+    texts = list(Phrase.objects.filter(is_active=True).values_list("text", flat=True))
+    return random.choice(texts or defaults.PHRASES)
 
 
 def in_window(now_local: dt.datetime, start: dt.time, end: dt.time) -> bool:

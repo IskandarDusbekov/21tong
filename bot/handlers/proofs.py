@@ -41,7 +41,7 @@ async def voice(message: Message):
         p = await backend.voice(message.from_user.id, message.voice.file_id)
     except ApiError as e:
         return await message.answer(f"⛔ {e.detail}")
-    await message.answer(texts.VOICE_OK.format(day=p["day_number"]))
+    await message.answer(texts.t("voice_ok", day=p["day_number"]))
     await announce(message.bot, p, message)
 
 
@@ -52,13 +52,13 @@ async def video(message: Message):
         p = await backend.video(message.from_user.id, media.file_id, media.duration or 0)
     except ApiError as e:
         return await message.answer(f"⛔ {e.detail}")
-    await message.answer(texts.VIDEO_SENT if p["proof_status"] == "reviewing" else texts.VIDEO_AUTO)
+    await message.answer(texts.t("video_sent") if p["proof_status"] == "reviewing" else texts.t("voice_ok", day=p["day_number"]))
     await announce(message.bot, p, message)
 
 
 @router.message(F.chat.type == "private", F.audio | F.photo | F.document)
 async def wrong_media(message: Message):
-    await message.answer(texts.UNKNOWN_MEDIA)
+    await message.answer(texts.t("unknown_media"))
 
 
 @router.callback_query(F.data.startswith("vote:"))
@@ -70,4 +70,4 @@ async def vote(call: CallbackQuery):
         return await call.answer(str(e.detail), show_alert=True)
     verdict = "✅ Siz tasdiqladingiz" if approved == "1" else "❌ Siz rad etdingiz"
     await call.message.edit_text(f"{call.message.html_text}\n\n<b>{verdict}</b>", reply_markup=None)
-    await call.answer(texts.VOTE_THANKS)
+    await call.answer(texts.t("vote_thanks"))

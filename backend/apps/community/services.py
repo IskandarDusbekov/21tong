@@ -14,8 +14,9 @@ def add_reflection(membership, text, now=None):
     text = (text or "").strip()
     if not text:
         raise RuleError("Javob bo'sh bo'lmasin.")
-    if len(text) > rules.REFLECTION_MAX_LENGTH:
-        raise RuleError(f"Maksimal {rules.REFLECTION_MAX_LENGTH} belgi.")
+    limit = rules.current().reflection_max_length
+    if len(text) > limit:
+        raise RuleError(f"Maksimal {limit} belgi.")
     cohort = membership.cohort
     if not rules.in_window(now, cohort.evening_window_start, cohort.evening_window_end):
         raise RuleError(f"Kechki oyna {cohort.evening_window_start:%H:%M}–{cohort.evening_window_end:%H:%M} da ochiq.")

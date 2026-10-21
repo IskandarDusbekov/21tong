@@ -34,6 +34,9 @@ class Backend:
     async def _json(self, method, url, **kwargs):
         return (await self._request(method, url, **kwargs)).json()
 
+    async def config(self):
+        return await self._json("GET", "/config/")
+
     # --- foydalanuvchi va ariza ---
     async def get_user(self, telegram_id):
         try:

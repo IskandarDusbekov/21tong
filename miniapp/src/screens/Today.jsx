@@ -1,11 +1,11 @@
 import { useState } from "react";
 import {
   AlarmClock, Ban, BedDouble, Check, CheckCircle2, Clock, Coins, Hourglass, Lock, Megaphone, Mic,
-  Moon, Send, Snowflake, Spade, Sun, Sunrise, Users, Video, XCircle,
+  Moon, Send, ShieldCheck, Snowflake, Sun, Sunrise, Users, Video, XCircle,
 } from "lucide-react";
 import { api } from "../api.js";
 import { Avatar, Empty, ErrorCard, Sheet, Skeleton, useAction, useLoad } from "../ui.jsx";
-import { STAGE_ICONS } from "./Journey.jsx";
+import { stageIcon } from "./Journey.jsx";
 
 function DayRing({ day, total }) {
   const r = 42;
@@ -36,7 +36,7 @@ function DayRing({ day, total }) {
 
 function Hero({ me }) {
   const { membership: m, today: t, journey: j } = me;
-  const StageIcon = j.stage ? STAGE_ICONS[j.stage.code] : Sunrise;
+  const StageIcon = j.stage ? stageIcon(j.stage) : Sunrise;
   return (
     <section className="hero">
       <div className="hero-top">
@@ -63,15 +63,15 @@ function Stats({ me }) {
     <div className="stats">
       <div className="stat">
         <div className="stat-icon" style={{ background: "var(--bad-soft)", color: "var(--bad)" }}><XCircle size={17} /></div>
-        <div className="strike-dots" aria-label={`${strikes} ta strike`}>
+        <div className="strike-dots" aria-label={`${strikes} ta ogohlantirish`}>
           {Array.from({ length: me.max_strikes }, (_, i) => <i key={i} className={i < strikes ? "on" : ""} />)}
         </div>
-        <small>Strike</small>
+        <small>Ogohlantirish</small>
       </div>
       <div className="stat">
-        <div className="stat-icon" style={{ background: "var(--rest-soft)", color: "var(--rest)" }}><Spade size={17} /></div>
-        <b className="num">{me.jokers}</b>
-        <small>Joker</small>
+        <div className="stat-icon" style={{ background: "var(--rest-soft)", color: "var(--rest)" }}><ShieldCheck size={17} /></div>
+        <b className="num">{me.immunities}</b>
+        <small>Immunitet</small>
       </div>
       <div className="stat">
         <div className="stat-icon" style={{ background: "color-mix(in srgb, #d99b1c 16%, transparent)", color: "#c98400" }}><Coins size={17} /></div>
@@ -145,7 +145,7 @@ function Chain({ t, gender, rules }) {
         hint={
           isVideo
             ? "Tashqariga chiqing, suv iching. Yurib turib gapni o'qigan holda video krujok yozing va botga yuboring. Rotadan 3 kishi tekshiradi."
-            : `Gapni ovoz chiqarib o'qing va ovozli xabarni botga yuboring. Video ${rules.video_from_day}-kundan boshlanadi.`
+            : `Gapni ovoz chiqarib o'qing va budilnikdan keyin ${rules.voice_deadline_minutes} daqiqa ichida ovozli xabarni botga yuboring.` + (rules.video_from_day ? ` Video ${rules.video_from_day}-kundan boshlanadi.` : "")
         }
       >
         {isVideo && gender === "F" && (
@@ -220,8 +220,8 @@ function SquadRoll() {
 
 const DAY_BANNERS = {
   completed: { tone: "ok", icon: CheckCircle2, title: "Bugungi kun bajarildi", text: "Sen zo'r ketyapsan. Ertaga ham shunday!" },
-  frozen: { tone: "ice", icon: Snowflake, title: "Bugun muzlatilgan kun", text: "Dam oling va tezroq tuzaling. Strike berilmaydi." },
-  rest: { tone: "rest", icon: BedDouble, title: "Yakshanba — dam olish", text: "Strike yo'q. Barvaqt turganlar Joker oladi." },
+  frozen: { tone: "ice", icon: Snowflake, title: "Bugun muzlatilgan kun", text: "Dam oling va tezroq tuzaling. Ogohlantirish berilmaydi." },
+  rest: { tone: "rest", icon: BedDouble, title: "Yakshanba — dam olish", text: "Ogohlantirish yo'q. Barvaqt turganlar Immunitet oladi." },
   failed: { tone: "bad", icon: XCircle, title: "Bugun bajarilmadi", text: "Sen o'zgaraman deb kelganding. Ertaga isbotla." },
 };
 
@@ -260,7 +260,7 @@ export default function Today({ me, error, reload }) {
           {isSunday && (
             <div className="banner rest">
               <div className="banner-icon"><BedDouble size={22} /></div>
-              <div><b>Yakshanba</b><small className="muted">Uxlash mumkin. Lekin hammasini bajarsangiz — 1 ta Joker.</small></div>
+              <div><b>Yakshanba</b><small className="muted">Uxlash mumkin. Lekin hammasini bajarsangiz — 1 ta Immunitet.</small></div>
             </div>
           )}
           {t.woke && !t.proof_done && t.phrase && <OrderCard t={t} />}
@@ -280,7 +280,7 @@ export default function Today({ me, error, reload }) {
       <div className="section-title">Chat oynalari</div>
       <Windows windows={me.journey.windows} />
 
-      {!me.membership.freeze_used && (
+      {me.membership.freezes_left > 0 && (
         <button className="btn btn-ghost btn-block" style={{ marginTop: 18 }} onClick={() => setAskFreeze(true)}>
           <Snowflake size={17} /> Ertangi kunni muzlatish
         </button>
@@ -288,7 +288,7 @@ export default function Today({ me, error, reload }) {
       {askFreeze && (
         <Sheet
           icon={Snowflake} tone="var(--ice)" title="Ertangi kunni muzlatasizmi?"
-          text="Kasal bo'lsangiz — ertangi kun uchun Strike berilmaydi. Bu imkoniyat butun oqimda faqat 1 marta va faqat kechqurun ishlaydi."
+          text={`Kasal bo'lsangiz — ertangi kun uchun ogohlantirish berilmaydi. Qolgan imkoniyat: ${me.membership.freezes_left} ta, faqat kechqurun ishlaydi.`}
           confirm="Muzlatish"
           onConfirm={() => run(() => api.freeze(""), "Ertangi kun muzlatildi. Tuzalib keting!")}
           onClose={() => setAskFreeze(false)}

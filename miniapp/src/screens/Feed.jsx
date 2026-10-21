@@ -3,9 +3,7 @@ import { Flame, Lock, MessageCircleHeart, Moon, Send } from "lucide-react";
 import { api } from "../api.js";
 import { Avatar, Empty, ErrorCard, Skeleton, useAction, useLoad } from "../ui.jsx";
 
-const MAX = 200;
-
-function Composer({ evening, onSent }) {
+function Composer({ evening, max, onSent }) {
   const [text, setText] = useState("");
   const [run, busy] = useAction(() => { setText(""); onSent(); });
 
@@ -20,11 +18,11 @@ function Composer({ evening, onSent }) {
       </div>
     );
   }
-  const left = MAX - text.length;
+  const left = max - text.length;
   return (
     <div className="card composer">
       <textarea
-        maxLength={MAX} value={text} onChange={(e) => setText(e.target.value)}
+        maxLength={max} value={text} onChange={(e) => setText(e.target.value)}
         placeholder="Bugun nima o'zgardi? Qayerda qiyin bo'ldi?" aria-label="Refleksiya"
       />
       <div className="composer-foot">
@@ -60,6 +58,7 @@ export default function Feed({ me }) {
   const { data, error, reload } = useLoad(api.feed);
   const [run] = useAction(reload);
   const evening = me?.journey?.windows.evening;
+  const max = me?.reflection_max_length || 200;
   const mine = data?.some((r) => r.mine);
 
   return (
@@ -67,13 +66,13 @@ export default function Feed({ me }) {
       <div className="screen-head">
         <div>
           <h2>Bugungi kun qanday o'tdi?</h2>
-          <p className="muted small">Faqat rotangiz ko'radi · maks {MAX} belgi</p>
+          <p className="muted small">Faqat rotangiz ko'radi · maks {max} belgi</p>
         </div>
         <div className="window-icon" style={{ background: "var(--rest-soft)", color: "var(--rest)" }}><Moon size={18} /></div>
       </div>
 
       {error && !data && <ErrorCard text={error} />}
-      {evening && !mine && data && <div style={{ marginBottom: 14 }}><Composer evening={evening} onSent={reload} /></div>}
+      {evening && !mine && data && <div style={{ marginBottom: 14 }}><Composer evening={evening} max={max} onSent={reload} /></div>}
 
       {!data && !error && <div className="stack"><Skeleton height={96} /><Skeleton height={96} /></div>}
       {data?.length === 0 && <Empty icon={MessageCircleHeart} title="Hali hech kim yozmadi" text="Birinchi bo'lib bugungi kuningiz haqida yozing." />}

@@ -36,10 +36,13 @@ class Join(StatesGroup):
 
 
 async def begin(message: Message, state: FSMContext, referral_code=None):
+    await texts.refresh()
+    if not texts.setting("registration_open", True):
+        return await message.answer(texts.t("registration_closed"))
     await state.clear()
     await state.update_data(referral_code=referral_code)
     await state.set_state(Apply.gender)
-    await message.answer(texts.WELCOME, reply_markup=keyboards.gender())
+    await message.answer(texts.t("welcome"), reply_markup=keyboards.gender())
 
 
 @router.message(CommandStart())
@@ -47,11 +50,11 @@ async def start(message: Message, command: CommandObject, state: FSMContext):
     user = await backend.get_user(message.from_user.id)
     status = user and user["status"]
     if status == "pending":
-        return await message.answer(texts.ALREADY_PENDING)
+        return await message.answer(texts.t("already_pending"))
     if status == "approved":
         return await message.answer(texts.welcome_back(user))
     if status == "rejected":
-        return await message.answer(texts.REJECTED)
+        return await message.answer(texts.t("rejected"))
     await begin(message, state, command.args)
 
 
@@ -59,15 +62,15 @@ async def start(message: Message, command: CommandObject, state: FSMContext):
 async def holat(message: Message):
     user = await backend.get_user(message.from_user.id)
     if not user:
-        return await message.answer(texts.NOT_REGISTERED)
+        return await message.answer(texts.t("not_registered"))
     if user["status"] != "approved":
-        return await message.answer(texts.ALREADY_PENDING if user["status"] == "pending" else texts.REJECTED)
+        return await message.answer(texts.t("already_pending") if user["status"] == "pending" else texts.t("rejected"))
     await message.answer(texts.welcome_back(user))
 
 
 @router.message(Command("nizom"))
 async def nizom(message: Message):
-    await message.answer(texts.RULES)
+    await message.answer(texts.t("rules"))
 
 
 @router.callback_query(Apply.gender, F.data.startswith("gender:"))
@@ -75,7 +78,7 @@ async def chose_gender(call: CallbackQuery, state: FSMContext):
     await state.update_data(gender=call.data.split(":")[1])
     await state.set_state(Apply.goal)
     await call.message.edit_reply_markup(reply_markup=None)
-    await call.message.answer(texts.ASK_GOAL)
+    await call.message.answer(texts.t("ask_goal"))
     await call.answer()
 
 
@@ -83,17 +86,17 @@ async def chose_gender(call: CallbackQuery, state: FSMContext):
 async def got_goal(message: Message, state: FSMContext):
     goal = message.text.strip()
     if len(goal) < 10:
-        return await message.answer(texts.GOAL_TOO_SHORT)
+        return await message.answer(texts.t("goal_too_short"))
     await state.update_data(goal=goal[:500])
     await state.set_state(Apply.current)
-    await message.answer(texts.ASK_CURRENT_TIME)
+    await message.answer(texts.t("ask_current_time"))
 
 
 @router.message(Apply.current, F.text.regexp(TIME_RE))
 async def got_current(message: Message, state: FSMContext):
     await state.update_data(current=norm_time(message.text))
     await state.set_state(Apply.target)
-    await message.answer(texts.ASK_TARGET_TIME)
+    await message.answer(texts.t("ask_target_time"))
 
 
 @router.message(Apply.target, F.text.regexp(TIME_RE))
@@ -101,7 +104,7 @@ async def got_target(message: Message, state: FSMContext):
     target = norm_time(message.text)
     data = await state.get_data()
     if target > data["current"]:
-        return await message.answer(texts.TARGET_LATER)
+        return await message.answer(texts.t("target_later"))
     await state.update_data(target=target)
     await state.set_state(Apply.confirm)
     await message.answer(texts.application_summary({**data, "target": target}), reply_markup=keyboards.confirm_application())
@@ -110,7 +113,7 @@ async def got_target(message: Message, state: FSMContext):
 @router.message(Apply.current)
 @router.message(Apply.target)
 async def bad_time(message: Message):
-    await message.answer(texts.BAD_TIME)
+    await message.answer(texts.t("bad_time"))
 
 
 @router.callback_query(Apply.confirm, F.data == "apply:restart")
@@ -138,13 +141,13 @@ async def send(call: CallbackQuery, state: FSMContext):
     await call.message.edit_reply_markup(reply_markup=None)
     await call.answer()
 
-    await call.message.answer(texts.SUBMITTED)
+    await call.message.answer(texts.t("submitted"))
     me = await call.bot.me()
     link = f"https://t.me/{me.username}?start={user['referral_code']}"
     png = await backend.manifest(u.id)
     await call.message.answer_photo(
         BufferedInputFile(png, filename="manifest.png"),
-        caption=texts.MANIFEST_CAPTION.format(link=link),
+        caption=texts.t("manifest_caption", link=link),
     )
 
 
@@ -154,9 +157,9 @@ async def send(call: CallbackQuery, state: FSMContext):
 async def join(message: Message, state: FSMContext):
     user = await backend.get_user(message.from_user.id)
     if not user:
-        return await message.answer(texts.NOT_REGISTERED)
+        return await message.answer(texts.t("not_registered"))
     if user["status"] != "approved":
-        return await message.answer(texts.ALREADY_PENDING)
+        return await message.answer(texts.t("already_pending"))
     cohorts = await backend.recruiting_cohorts()
     if not cohorts:
         return await message.answer("Hozircha qabul ochiq oqim yo'q. E'lon qilinishi bilan xabar beramiz.")
@@ -168,7 +171,7 @@ async def chose_cohort(call: CallbackQuery, state: FSMContext):
     await state.update_data(cohort_id=int(call.data.split(":")[1]))
     await state.set_state(Join.start_time)
     await call.message.edit_reply_markup(reply_markup=None)
-    await call.message.answer(texts.ASK_CURRENT_TIME)
+    await call.message.answer(texts.t("ask_current_time"))
     await call.answer()
 
 
@@ -176,7 +179,7 @@ async def chose_cohort(call: CallbackQuery, state: FSMContext):
 async def join_start(message: Message, state: FSMContext):
     await state.update_data(start=norm_time(message.text))
     await state.set_state(Join.target_time)
-    await message.answer(texts.ASK_TARGET_TIME)
+    await message.answer(texts.t("ask_target_time"))
 
 
 @router.message(Join.target_time, F.text.regexp(TIME_RE))
@@ -200,4 +203,4 @@ async def join_target(message: Message, state: FSMContext):
 @router.message(Join.start_time)
 @router.message(Join.target_time)
 async def join_bad_time(message: Message):
-    await message.answer(texts.BAD_TIME)
+    await message.answer(texts.t("bad_time"))

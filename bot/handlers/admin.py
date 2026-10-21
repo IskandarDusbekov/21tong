@@ -80,7 +80,7 @@ async def link_pick(call: CallbackQuery):
     if invite:
         for tg in r["members"]:
             try:
-                await call.bot.send_message(tg, texts.squad_invite(r["name"], invite))
+                await call.bot.send_message(tg, texts.t("squad_invite", squad=r["name"], link=invite))
             except TelegramAPIError:
                 pass
 
@@ -95,6 +95,6 @@ async def join_request(req: ChatJoinRequest):
     else:
         await req.decline()
         try:
-            await req.bot.send_message(req.from_user.id, texts.JOIN_DENIED)
+            await req.bot.send_message(req.from_user.id, texts.t("join_denied"))
         except TelegramAPIError:
             pass
