@@ -3,28 +3,13 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 
-from .models import BotMessage, Broadcast, CampSettings, Phrase, Stage
+from .models import SETTINGS_GROUPS, BotMessage, Broadcast, CampSettings, Phrase, Stage
 from .services import send_broadcast
 
 
 @admin.register(CampSettings)
 class CampSettingsAdmin(admin.ModelAdmin):
-    fieldsets = (
-        ("Uyg'onish va raport", {"fields": (
-            "wake_grace_minutes", "voice_deadline_minutes", "video_from_day", "video_deadline_minutes",
-            "reviewers_per_proof", "unreviewed_counts_as_approved",
-        )}),
-        ("Kaizen — budilnikni surish", {"fields": ("shift_from_day", "shift_step_minutes")}),
-        ("Jazo va mukofot", {"fields": (
-            "max_strikes", "sunday_rest", "sunday_immunity", "referral_immunity",
-            "freezes_per_cohort", "freeze_allowed_from",
-        )}),
-        ("Jamoa va ariza", {"fields": ("squad_size", "reflection_max_length", "registration_open")}),
-        ("Yangi oqim uchun standart qiymatlar", {"fields": (
-            "default_duration_days", "default_morning_start", "default_morning_end",
-            "default_evening_start", "default_evening_end",
-        )}),
-    )
+    fieldsets = [(title, {"fields": fields}) for title, _, fields in SETTINGS_GROUPS]
 
     def has_add_permission(self, request):
         return False

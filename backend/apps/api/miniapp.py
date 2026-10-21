@@ -70,6 +70,7 @@ class SquadView(AppView):
         report = services.squad_report(m.squad, services.local_now().date())
         for row in report["members"]:
             row["me"] = row.pop("telegram_id") == request.user.telegram_id
+            row.pop("membership_id")
         report.pop("chat_id")
         return Response(report)
 

@@ -122,6 +122,8 @@ TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
 DEV_LOGIN = DEBUG and env_bool("DEV_LOGIN", True)
 # `npm run build` natijasi — DEV_LOGIN yoqilgan bo'lsa runserver uni "/" da ko'rsatadi
 MINIAPP_DIST = BASE_DIR.parent / "miniapp" / "dist"
+# Boshqaruv paneli build'i (`panel/` da `npm run build`) — DEBUG da http://localhost:8000/panel/
+PANEL_DIST = BASE_DIR.parent / "panel" / "dist"
 # Manifest rasmi uchun TTF shrift (bo'sh bo'lsa Pillow standart shrifti)
 MANIFEST_FONT_PATH = os.getenv("MANIFEST_FONT_PATH", "")
 # Bot -> backend so'rovlari uchun umumiy maxfiy kalit (X-Bot-Secret sarlavhasi)

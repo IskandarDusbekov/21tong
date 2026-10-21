@@ -512,6 +512,7 @@ def squad_report(squad, date):
     members = squad.memberships.select_related("user").order_by("user__first_name")
     rows = [
         {
+            "membership_id": m.id,
             "name": m.user.first_name or str(m.user),
             "telegram_id": m.user.telegram_id,
             "status": member_report(m, date),

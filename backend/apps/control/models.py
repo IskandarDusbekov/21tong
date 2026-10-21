@@ -122,6 +122,25 @@ class CampSettings(models.Model):
         }
 
 
+# Sozlamalar sahifasidagi guruhlar: (sarlavha, ikonka, maydonlar). Admin va boshqaruv paneli ishlatadi.
+SETTINGS_GROUPS = [
+    ("Uyg'onish va raport", "alarm-clock", [
+        "wake_grace_minutes", "voice_deadline_minutes", "video_from_day", "video_deadline_minutes",
+        "reviewers_per_proof", "unreviewed_counts_as_approved",
+    ]),
+    ("Kaizen — budilnikni surish", "trending-down", ["shift_from_day", "shift_step_minutes"]),
+    ("Jazo va mukofot", "shield", [
+        "max_strikes", "sunday_rest", "sunday_immunity", "referral_immunity",
+        "freezes_per_cohort", "freeze_allowed_from",
+    ]),
+    ("Jamoa va ariza", "users", ["squad_size", "reflection_max_length", "registration_open"]),
+    ("Yangi oqim uchun standart qiymatlar", "calendar", [
+        "default_duration_days", "default_morning_start", "default_morning_end",
+        "default_evening_start", "default_evening_end",
+    ]),
+]
+
+
 class Phrase(models.Model):
     text = models.CharField("Gap", max_length=200)
     is_active = models.BooleanField("Faol", default=True)

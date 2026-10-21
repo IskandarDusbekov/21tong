@@ -17,12 +17,38 @@ backend/            Django + DRF — barcha biznes-qoidalar shu yerda
   apps/api/         /api/bot/* (X-Bot-Secret) va /api/app/* (Telegram initData)
 bot/                aiogram 3 — ariza, admin tasdig'i, buyruqlar, raportlar, budilnik, rota guruhlari
 miniapp/            React + Vite — Bugun / Yo'l / Lenta / Bounty / Reyting
+panel/              React + Vite — admin uchun boshqaruv paneli (/panel/)
 ```
 
 Bot hech qanday qoidani o'zi hal qilmaydi: u backend'ga so'rov yuboradi va `Notification` navbatidagi
 voqealarni (ariza, ogohlantirish, joker, tekshiruv...) Serjant/Murabbiy ohangida yetkazadi (`bot/texts.py`).
 
-## Admin panel — kod yozmasdan boshqarish
+## Boshqaruv paneli — kundalik ish uchun
+
+http://localhost:8000/panel/ — Django admin'dan tashqari, sodda va chiroyli panel (kompyuter va telefon).
+Kirish — admin login va parolingiz (`createsuperuser` bilan yaratilgan, `is_staff` bo'lishi kerak).
+
+- **Bosh sahifa** — bugungi ko'rsatkichlar, oqim grafigi (kunlar bo'yicha bajardi / ogohlantirish / dam),
+  rotalarning tonggi raporti, yangi arizalar va so'nggi voqealar.
+- **Arizalar** — bir bosishda qabul qilish / rad etish.
+- **Ishtirokchilar** — qidiruv va filtrlar; har bir odam uchun 21 kunlik kalendar, ogohlantirishlar,
+  Immunitet berish, ogohlantirish berish/bekor qilish, chiqarish/qaytarish, rotani o'zgartirish,
+  bajarilmagan kunni uzrli qilish.
+- **Rotalar** — har rota kim turdi, kim yo'q; guruh ulanganmi.
+- **Video raportlar**, **Oqimlar** (yaratish, qabulni ochish, boshlash, yakunlash), **Ommaviy xabar**
+  (oldindan ko'rish va qabul qiluvchilar soni bilan).
+- **Lager qoidalari** — barcha sozlamalar va ularning amalda qanday ishlashini ko'rsatuvchi jonli misol.
+- **Bot matnlari** — Telegram ko'rinishidagi jonli oldindan ko'rish bilan; **Gaplar va bosqichlar**.
+
+Panel kodi o'zgarsa:
+
+```bash
+cd panel && npm install && npm run build
+```
+
+Tez ishlab chiqish uchun `npm run dev` (http://localhost:5174/panel/, API Django'ga proxy qilinadi).
+
+## Django admin — texnik boshqaruv
 
 http://localhost:8000/admin/ — bosh sahifada bugungi holat: yangi arizalar, raport berganlar, ogohlantirishlar,
 ulanmagan rota guruhlari va tezkor havolalar.
