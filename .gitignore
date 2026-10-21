@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# 21tong
+node_modules/
+miniapp/dist/
+backend/media/
+backend/staticfiles/
