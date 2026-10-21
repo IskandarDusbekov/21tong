@@ -128,3 +128,26 @@ class PanelDataTests(PanelTestCase):
 
 
 
+
+
+class PanelSlotsAwardsTests(PanelTestCase):
+    def test_slots_crud_and_clone(self):
+        url = f"/api/panel/cohorts/{self.cohort.id}/slots/"
+        slot = self.client.post(url, {"start_wake_time": "06:30", "target_wake_time": "05:30"}, format="json").json()
+        self.assertEqual(slot["start_wake_time"], "06:30")
+        dup = self.client.post(url, {"start_wake_time": "06:30", "target_wake_time": "05:30"}, format="json")
+        self.assertEqual(dup.status_code, 400)
+        wrong = self.client.post(url, {"start_wake_time": "05:00", "target_wake_time": "06:00"}, format="json")
+        self.assertEqual(wrong.status_code, 400)
+        self.client.patch(f"/api/panel/slots/{slot['id']}/", {"is_open": False}, format="json")
+        cohorts = self.client.get("/api/panel/cohorts/").json()["items"]
+        self.assertFalse(cohorts[0]["slots"][0]["is_open"])
+        r = self.client.post(f"/api/panel/cohorts/{self.cohort.id}/action/", {"action": "clone_next"}, format="json").json()
+        self.assertEqual(Cohort.objects.get(pk=r["id"]).slots.count(), 1)
+
+    def test_stage_preview(self):
+        from apps.control.models import Stage
+        stage = Stage.objects.first()
+        resp = self.client.get(f"/api/panel/stages/{stage.id}/preview.png")
+        self.assertEqual(resp["Content-Type"], "image/png")
+        self.assertIn("award_types", self.client.get("/api/panel/stages/icons/").json())

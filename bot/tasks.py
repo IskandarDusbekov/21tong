@@ -11,7 +11,7 @@ import logging
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
-from aiogram.types import ChatPermissions
+from aiogram.types import BufferedInputFile, ChatPermissions
 
 import config
 import keyboards
@@ -40,6 +40,9 @@ async def deliver(bot: Bot, n):
             await safe_send(bot, admin, texts.new_application(p, tg), reply_markup=keyboards.admin_decision(tg))
     elif kind == "approved":
         await bot.send_message(tg, texts.approved(p))
+        if p.get("squad"):
+            # Birinchi kundan tushunmovchilik bo'lmasin: raport qanday yuborilishi + mashq taklifi
+            await bot.send_message(tg, texts.t("guide"))
     elif kind == "rejected":
         await bot.send_message(tg, texts.t("rejected"))
     elif kind == "review_request":
@@ -64,7 +67,8 @@ async def deliver(bot: Bot, n):
             await bot.ban_chat_member(squad_chat, tg)
             await bot.unban_chat_member(squad_chat, tg, only_if_banned=True)
     elif kind == "stage_up":
-        await bot.send_message(tg, texts.stage_up(p))
+        png = await backend.award_image(p["award_id"])
+        await bot.send_photo(tg, BufferedInputFile(png, filename=f"21tong-{p['number']}.png"), caption=texts.award_caption(p))
     elif kind == "broadcast":
         await bot.send_message(tg, p["text"])
 
@@ -95,11 +99,27 @@ async def minute_loop(bot: Bot):
         now = dt.datetime.now(config.TZ)
         await asyncio.sleep(60 - now.second)
         hhmm = dt.datetime.now(config.TZ).strftime("%H:%M")
-        for job in (send_alarms(bot, hhmm), sync_windows(bot, hhmm, window_state), send_roll_calls(bot, hhmm)):
+        jobs = [send_alarms(bot, hhmm), sync_windows(bot, hhmm, window_state), send_roll_calls(bot, hhmm)]
+        if hhmm == DAILY_AT:
+            jobs.append(backend.run_daily())
+        if hhmm == COUNTDOWN_AT:
+            jobs.append(send_countdowns(bot))
+        for job in jobs:
             try:
                 await job
             except Exception:
                 log.exception("minute_loop")
+
+
+# Kunlik hisob (kechagi kunni baholash, oqimni boshlash) — cron kerak emas, bot o'zi chaqiradi
+DAILY_AT = "00:05"
+# Startni kutayotganlarga "Startga N kun qoldi" eslatmasi
+COUNTDOWN_AT = "20:00"
+
+
+async def send_countdowns(bot: Bot):
+    for r in await backend.countdown():
+        await safe_send(bot, r["telegram_id"], texts.countdown(r))
 
 
 async def send_alarms(bot: Bot, hhmm):

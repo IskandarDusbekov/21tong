@@ -4,3 +4,4 @@ psycopg[binary]>=3.3,<4
 python-dotenv>=1.2,<2
 pillow>=13,<14
 gunicorn>=23
+qrcode>=8,<9

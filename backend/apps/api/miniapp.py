@@ -1,6 +1,6 @@
 """Telegram Mini App API. Foydalanuvchi initData (yoki lokal dev kirish) orqali aniqlanadi."""
 from django.conf import settings
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import exceptions
 from rest_framework.permissions import IsAuthenticated
@@ -10,6 +10,8 @@ from rest_framework.views import APIView
 from apps.accounts.auth import DevAuthentication, TelegramInitDataAuthentication
 from apps.accounts.models import User
 from apps.camp import rules, services
+from apps.camp.awards import render_award
+from apps.camp.models import Award
 from apps.community import services as community
 from apps.community.models import Bounty, Reflection
 
@@ -38,8 +40,16 @@ class MeView(AppView):
             if m.cohort.day_number(now.date()):
                 today = services.day_progress(services.ensure_day_record(m, now.date()))
             journey = services.journey(m, now)
+        upcoming = services.upcoming_membership(user) if m is None else None
+        awards = Award.objects.filter(membership__user=user).select_related("stage").order_by("stage__day")
         return Response({
             "first_name": user.first_name,
+            "full_name": user.display_name,
+            "upcoming": {
+                **services.placement_payload(upcoming),
+                "rules": {"wake_grace": rules.current().wake_grace_minutes, "voice_deadline": rules.current().voice_deadline_minutes},
+            } if upcoming else None,
+            "awards": [services.award_json(a) for a in awards],
             "gender": user.gender,
             "status": user.status,
             "goal": user.goal,
@@ -142,6 +152,17 @@ class DevUsersView(APIView):
             }
             for u in users
         ])
+
+
+class AwardImageView(AppView):
+    """Faqat o'z mukofotining rasmi."""
+
+    def get(self, request, pk):
+        award = get_object_or_404(
+            Award.objects.select_related("membership__user", "membership__cohort", "stage"),
+            pk=pk, membership__user=request.user,
+        )
+        return HttpResponse(render_award(award), content_type="image/png")
 
 
 class LeaderboardView(AppView):

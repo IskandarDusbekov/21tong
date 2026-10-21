@@ -64,6 +64,18 @@ class Backend:
     async def recruiting_cohorts(self):
         return await self._json("GET", "/cohorts/recruiting/")
 
+    async def slots(self):
+        return await self._json("GET", "/slots/")
+
+    async def award_image(self, award_id) -> bytes:
+        return (await self._request("GET", f"/awards/{award_id}.png")).content
+
+    async def countdown(self):
+        return await self._json("GET", "/countdown/")
+
+    async def run_daily(self):
+        return await self._json("POST", "/run-daily/")
+
     async def join(self, **data):
         return await self._json("POST", "/join/", json=data)
 

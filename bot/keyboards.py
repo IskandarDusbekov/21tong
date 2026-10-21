@@ -25,8 +25,25 @@ def admin_decision(telegram_id):
     ])
 
 
-def cohorts(items):
-    return _kb(*[[B(text=f"{c['name']} — {c['start_date']}", callback_data=f"cohort:{c['id']}")] for c in items])
+def start_application():
+    return _kb([B(text="📝 Arizani boshlash", callback_data="apply:begin")])
+
+
+def regions(items):
+    """Viloyatlar — ikki ustunda."""
+    buttons = [B(text=r["label"], callback_data=f"region:{r['value']}") for r in items]
+    return _kb(*[buttons[i:i + 2] for i in range(0, len(buttons), 2)])
+
+
+def slots(items, prefix="slot"):
+    """Tayyor rotalar: «06:00 → 05:00 · Erta qushlar»."""
+    rows = []
+    for s in items:
+        label = f"⏰ {s['start_wake_time']} → {s['target_wake_time']}"
+        if s.get("title"):
+            label += f" · {s['title']}"
+        rows.append([B(text=label, callback_data=f"{prefix}:{s['id']}")])
+    return _kb(*rows)
 
 
 def squads(items):

@@ -320,6 +320,12 @@ table.table { width: 100%; border-collapse: collapse; }
 .icon-pick button { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; color: var(--text-2); }
 .icon-pick button.on { background: var(--sun); border-color: var(--sun); color: #fff; }
 
+.award-thumb { flex: none; width: 104px; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface-2); cursor: zoom-in; }
+.award-thumb img { display: block; width: 100%; height: auto; }
+.award-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.award-grid a { display: block; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+.award-grid img { display: block; width: 100%; height: auto; }
+
 /* ---------- Moslashuvchanlik ---------- */
 @media (max-width: 1100px) {
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }

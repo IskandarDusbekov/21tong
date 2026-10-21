@@ -57,6 +57,7 @@ export default function MemberDrawer({ id, onClose, onChanged }) {
               <span>Budilnik: <b className="num" style={{ color: "var(--text)" }}>{m.start_wake_time} → {m.target_wake_time}</b></span>
               <span>Qo'shilgan: {fmtDate(m.joined_at)}</span>
               <span>Oqim: {m.cohort.name}</span>
+              {m.user.region && <span>Viloyat: {m.user.region}</span>}
             </div>
             {m.goal && (
               <div className="row" style={{ alignItems: "flex-start", gap: 8, marginTop: 12, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 10 }}>
@@ -136,6 +137,19 @@ export default function MemberDrawer({ id, onClose, onChanged }) {
               ))}
             </ul>
           </div>
+
+          {m.awards.length > 0 && (
+            <div className="card">
+              <div className="card-head"><h3>Mukofotlar</h3><span className="muted small">{m.awards.length} ta</span></div>
+              <div className="card-pad award-grid">
+                {m.awards.map((a) => (
+                  <a key={a.id} href={api.awardUrl(a.id)} target="_blank" rel="noreferrer" title={`${a.stage} · ${a.award} · ${a.number}`}>
+                    <img src={api.awardUrl(a.id)} alt={`${a.stage} mukofoti`} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {m.immunities_list.length > 0 && (
             <div className="card">

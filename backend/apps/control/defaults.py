@@ -20,68 +20,110 @@ MESSAGES = {
     "welcome": ("Ariza", "Kirish (/start)", (), (
         "🎖 <b>21 TONG — intizom lageri</b>\n\n"
         "{duration} kun. Har tong — raport. Bahona qabul qilinmaydi.\n\n"
-        "<b>Nizom qisqacha:</b>\n"
-        "• Budilnik bo'yicha turasan va {wake_grace} daqiqa ichida «Uyg'ondim» bosasan\n"
-        "• {voice_deadline} daqiqa ichida bot bergan gapni o'qib, ovozli raport yuborasan\n"
+        "<b>Qanday ishlaydi:</b>\n"
+        "• O'zingizga mos <b>tayyor rotani</b> tanlaysiz (masalan 06:00 da turadiganlar)\n"
+        "• Har tong budilnik vaqtida bot uyg'otadi — «Uyg'ondim» bosasiz\n"
+        "• {voice_deadline} daqiqa ichida bot bergan gapni o'qib, <b>ovozli raport</b> yuborasiz\n"
         "• {shift_from_day}-kundan budilnik har kuni {shift_step} daqiqa oldinga suriladi\n"
-        "• {squad_size} kishilik rotada yashaysan, rotadoshlaring seni ko'rib turadi\n"
-        "• {max_strikes} ta ogohlantirish — lagerdan chiqarilasan\n\n"
-        "Tayyormisan? Arizani to'ldiramiz.\n\n"
-        "<b>1/4.</b> Jinsingiz:"
+        "• Bosqichlarda <b>pogon, medal va sertifikat</b> olasiz\n"
+        "• {max_strikes} ta ogohlantirish — lagerdan chiqarilasiz\n\n"
+        "Arizani to'ldiramiz — 1 daqiqa vaqt oladi."
     )),
     "registration_closed": ("Ariza", "Qabul yopiq", (), (
         "Hozircha ariza qabul qilinmayapti. Keyingi oqim e'lon qilinishini kuting."
     )),
-    "ask_goal": ("Ariza", "2-savol: maqsad", (), (
-        "<b>2/4.</b> Nima uchun keldingiz? Maqsadingizni yozing.\n"
-        "<i>Masalan: «Har kuni 5:30 da turib, bomdod va sportni qoldirmayman.»</i>"
+    "ask_first_name": ("Ariza", "1-savol: ism", (), "<b>1/6.</b> Ismingiz?"),
+    "ask_last_name": ("Ariza", "2-savol: familiya", (), "<b>2/6.</b> Familiyangiz?"),
+    "bad_name": ("Ariza", "Ism/familiya xato", (), "Iltimos, to'g'ri yozing: 2–30 ta harf."),
+    "ask_region": ("Ariza", "3-savol: viloyat", (), "<b>3/6.</b> Qaysi viloyatdansiz?"),
+    "ask_gender": ("Ariza", "4-savol: jins", (), (
+        "<b>4/6.</b> Jinsingiz?\n<i>Yigitlar va qizlar alohida rotalarda bo'ladi.</i>"
+    )),
+    "ask_goal": ("Ariza", "5-savol: maqsad", (), (
+        "<b>5/6.</b> Nima uchun keldingiz? Maqsadingizni bir-ikki gap bilan yozing.\n"
+        "<i>Masalan: «Har kuni erta turib, bomdod va sportni qoldirmayman.»</i>"
     )),
     "goal_too_short": ("Ariza", "Maqsad juda qisqa", (), "Bu maqsad emas, bu bahona. Kamida 10 belgi — aniqroq yozing."),
-    "ask_current_time": ("Ariza", "3-savol: hozirgi vaqt", (), (
-        "<b>3/4.</b> Hozir odatda soat nechada turasiz? (Masalan: <code>07:00</code>)"
+    "ask_slot": ("Ariza", "6-savol: rotani tanlash", ("cohort", "start_date", "days_left"), (
+        "<b>6/6.</b> Rotangizni tanlang.\n\n"
+        "Oqim: <b>{cohort}</b> · start <b>{start_date}</b> ({days_left} kun qoldi)\n\n"
+        "Har bir rota — boshlang'ich vaqt → maqsad vaqti. Budilnik {shift_from_day}-kundan har kuni "
+        "{shift_step} daqiqa oldinga suriladi va maqsadga silliq yetasiz."
     )),
-    "ask_target_time": ("Ariza", "4-savol: maqsad vaqti", (), (
-        "<b>4/4.</b> Qaysi vaqtda turishni maqsad qilasiz? (Masalan: <code>05:30</code>)\n"
-        "<i>{shift_from_day}-kundan budilnik har kuni {shift_step} daqiqa oldinga suriladi — maqsadga silliq yetasiz.</i>"
+    "no_slots": ("Ariza", "Ochiq rota yo'q", (), (
+        "Hozircha ochiq rota yo'q. Yangi oqim e'lon qilinishi bilan xabar beramiz."
     )),
-    "bad_time": ("Ariza", "Vaqt formati xato", (), "Vaqtni HH:MM formatida yozing, masalan 06:30."),
-    "target_later": ("Ariza", "Maqsad vaqti kech", (), "Maqsad vaqti hozirgidan erta bo'lishi kerak. Qaytadan yozing."),
-    "application_summary": ("Ariza", "Arizani tasdiqlash", ("gender", "goal", "current", "target"), (
+    "application_summary": ("Ariza", "Arizani tasdiqlash", ("full_name", "region", "gender", "goal", "slot", "start_date"), (
         "📝 <b>Arizangiz</b>\n\n"
-        "Jins: {gender}\nMaqsad: {goal}\nHozir turadi: <b>{current}</b>\nMaqsad vaqti: <b>{target}</b>\n\n"
+        "Ism-familiya: <b>{full_name}</b>\nViloyat: {region}\nJins: {gender}\n"
+        "Rota: <b>{slot}</b>\nStart: {start_date}\n"
+        "Maqsad: <i>{goal}</i>\n\n"
         "Hammasi to'g'rimi? Yuborilgandan keyin jinsni o'zgartirib bo'lmaydi."
     )),
     "submitted": ("Ariza", "Ariza yuborildi", (), (
-        "✅ Ariza qabul qilindi va qo'mondonlikka yuborildi.\n"
-        "Tasdiqlangach, sizni rotaga joylashtiramiz va guruh havolasini yuboramiz.\n\n"
-        "Mana sizning <b>Manifestingiz</b> 👇"
+        "✅ Ariza qo'mondonlikka yuborildi.\n"
+        "Tasdiqlangach, rotangiz, start sanasi va lager qoidalari keladi.\n\n"
+        "Endi eng muhimi 👇"
     )),
-    "manifest_caption": ("Ariza", "Manifest rasmi ostidagi matn", ("link",), (
-        "Storisga joylang va do'stlaringizni chaqiring.\n"
-        "Havolangiz orqali kelgan do'stingiz qabul qilinsa — loyiha boshlanmasidanoq <b>1 ta Immunitet 🛡</b>.\n\n"
-        "Havola: {link}"
+    "manifest_caption": ("Ariza", "Taklif rasmi ostidagi matn", ("link",), (
+        "🤝 <b>Yolg'iz bo'lma — rota bo'lib harakat qil!</b>\n\n"
+        "Erta turish birga osonroq. Bu rasmni storisga joylang yoki do'stingizga yuboring — "
+        "u ham shu havola orqali qo'shilsin:\n{link}"
     )),
     "already_pending": ("Ariza", "Ariza ko'rib chiqilmoqda", (), "⏳ Arizangiz ko'rib chiqilmoqda. Sabr — bu ham intizom."),
     "rejected": ("Ariza", "Ariza rad etildi", (), "Afsus, bu safar arizangiz qabul qilinmadi. Keyingi oqimda yana urinib ko'ring."),
     "not_registered": ("Ariza", "Ro'yxatdan o'tmagan", (), "Avval ariza qoldiring: /start"),
-    "approved": ("Ariza", "Qabul qilindi (rotaga joylashdi)", ("cohort", "start_date", "tribe", "squad", "invite"), (
-        "🎖 <b>QABUL QILINDINGIZ!</b>\n\n"
-        "Oqim: <b>{cohort}</b> · start {start_date}\n"
-        "Qabila: {tribe}\n"
-        "Rota: <b>{squad}</b>\n\n"
+    "approved": ("Ariza", "Qabul qilindi (rotaga joylashdi)",
+                 ("name", "cohort", "start_date", "days_left", "tribe", "squad", "alarm", "target", "invite"), (
+        "🎖 <b>QABUL QILINDINGIZ, {name}!</b>\n\n"
+        "Oqim: <b>{cohort}</b>\n"
+        "Start: <b>{start_date}</b> ({days_left} kun qoldi)\n"
+        "Rota: <b>{squad}</b> · {tribe}\n"
+        "Birinchi budilnik: <b>{alarm}</b> → maqsad {target}\n\n"
         "{invite}\n\n"
-        "Birinchi tongda saf tortamiz. Kech qolma."
+        "Quyida — raport qanday yuborilishi. Diqqat bilan o'qing 👇"
     )),
     "approved_waiting": ("Ariza", "Qabul qilindi (oqim hali yo'q)", (), (
-        "🎖 <b>QABUL QILINDINGIZ!</b>\nYangi oqim e'lon qilinganda rotaga joylashtirasiz. Kuzatib boring."
+        "🎖 <b>QABUL QILINDINGIZ!</b>\nYangi oqim e'lon qilinganda /join orqali rotani tanlaysiz. Kuzatib boring."
     )),
     "invite_link": ("Ariza", "Guruh havolasi qatori", ("link",), "Rota guruhiga kiring: {link}"),
-    "invite_pending": ("Ariza", "Guruh havolasi hali yo'q", (), "Rota guruhi havolasi tez orada keladi."),
+    "invite_pending": ("Ariza", "Guruh havolasi hali yo'q", (), "Rota guruhi havolasi startgacha keladi."),
     "welcome_back": ("Ariza", "Holat (/holat)", ("name", "tribe", "squad", "strikes", "immunities"), (
         "🎖 {name}, saf tortish joyingiz:\n"
         "{tribe} · <b>{squad}</b>\n"
         "Ogohlantirishlar: {strikes}/{max_strikes} · Immunitet: {immunities}\n\n"
-        "Buyruqlar: /holat — holat, /nizom — lager qoidalari"
+        "Buyruqlar: /holat — holat, /yoriqnoma — raport qanday yuboriladi, /nizom — lager qoidalari"
+    )),
+    "guide": ("Ariza", "Yo'riqnoma (/yoriqnoma)", (), (
+        "📘 <b>YO'RIQNOMA — har tong nima qilasiz</b>\n\n"
+        "1️⃣ Budilnik vaqtida bot sizga ⏰ <b>TURISH!</b> xabarini yuboradi.\n"
+        "2️⃣ Xabar ostidagi <b>«☀️ Uyg'ondim»</b> tugmasini bosing — {wake_grace} daqiqa ichida.\n"
+        "3️⃣ Bot <b>BUYRUQ</b> va bugungi gapni yuboradi.\n"
+        "4️⃣ Gapni <b>shu botga ovozli xabar</b> qilib yuboring — budilnikdan keyin {voice_deadline} daqiqa ichida:\n"
+        "     • pastki o'ng burchakdagi 🎙 <b>mikrofon</b> tugmasini bosib turing\n"
+        "     • gapni ovoz chiqarib, aniq o'qing\n"
+        "     • barmog'ingizni qo'yib yuboring — xabar o'zi ketadi\n"
+        "     <i>Mikrofon o'rnida 📷 ko'rinsa — unga bir marta bosing, 🎙 ga almashadi.</i>\n"
+        "5️⃣ Bot «✅ Raport qabul qilindi» deydi — kuningiz yozildi.\n\n"
+        "❗ Raport rota guruhiga emas, <b>shu botga</b> yuboriladi. Bot uni rotangizga o'zi e'lon qiladi.\n\n"
+        "🎯 <b>Hozir mashq qiling:</b> istalgan gapni ovozli xabar qilib shu yerga yuboring."
+    )),
+    "practice_ok": ("Ariza", "Mashq raporti qabul qilindi", ("start_date", "days_left", "alarm"), (
+        "✅ <b>Zo'r! Mashq raporti qabul qilindi.</b>\n"
+        "Start kuni aynan shunday yuborasiz. Start: <b>{start_date}</b> ({days_left} kun qoldi), birinchi budilnik <b>{alarm}</b>."
+    )),
+    "practice_waiting": ("Ariza", "Mashq (oqim hali yo'q)", (), (
+        "✅ Mashq raporti qabul qilindi. Oqim boshlanganda aynan shunday yuborasiz."
+    )),
+    "countdown": ("Ariza", "Startgacha eslatma (har kech)", ("days_left", "start_date", "squad", "alarm"), (
+        "⏳ Startga <b>{days_left} kun</b> qoldi ({start_date}).\n"
+        "Rota: {squad} · birinchi budilnik <b>{alarm}</b>.\nBugundan erta yotishni odat qiling."
+    )),
+    "countdown_tomorrow": ("Ariza", "Startdan bir kun oldin", ("alarm", "squad"), (
+        "🔥 <b>ERTAGA START!</b>\n\n"
+        "Birinchi budilnik: <b>{alarm}</b> · {squad}\n"
+        "Bugun erta yoting va telefon ovozini yoqib qo'ying.\n"
+        "Bot «TURISH!» deb yozadi — «Uyg'ondim»ni bosing va ovozli raport yuboring. Omad, jangchi!"
     )),
     "rules": ("Ariza", "Lager nizomi (/nizom)", (), (
         "📜 <b>LAGER NIZOMI</b>\n\n"
@@ -172,8 +214,12 @@ MESSAGES = {
     "expelled_public": ("Jazo", "Lagerdan chiqarildi (rota guruhiga)", ("name",), (
         "🚫 <b>{name}</b> {max_strikes} ta ogohlantirish oldi va lagerdan chiqarildi."
     )),
-    "stage_up": ("Jazo", "Yangi bosqich", ("name", "day", "description"), (
-        "🏅 <b>{name}</b>! Siz {day} kunni ortda qoldirdingiz.\n{description}\n\n"
+    "award_caption": ("Jazo", "Bosqich mukofoti (rasm ostida)",
+                      ("name", "stage", "day", "rank", "award", "description", "number"), (
+        "🎖 <b>{name}, tabriklaymiz!</b>\n\n"
+        "Siz <b>{day} kun</b>ni ortda qoldirdingiz va «<b>{stage}</b>» bosqichiga chiqdingiz.\n"
+        "{description}\n\n"
+        "Mukofot: <b>{award}</b> · {rank}\nRaqam: <code>{number}</code>\n\n"
         "Hozir qanchalik qiyin bo'lmasin, sen zo'r ketyapsan. Men senga ishonaman!"
     )),
 
@@ -206,9 +252,9 @@ PHRASES = [
 ]
 
 STAGES = [
-    # (kun, nom, tavsif, ikonka)
-    (3, "Omon qolgan", "Tananing shoki ortda. Vaqtida turish va ovozli raport odatga aylanmoqda.", "sprout"),
-    (7, "Moslashgan", "Tana yangi rejimga moslashdi. Budilnik har kuni oldinga surilmoqda.", "mountain"),
-    (21, "Temir Iroda", "Qat'iy rejim. Odat shakllandi — endi bu sizning hayotingiz.", "shield"),
-    (40, "Yengilmas / Mentor", "Eng kuchlilar. Keyingi oqimlarda yangilarni tekshirasiz va ustoz bo'lasiz.", "crown"),
+    # (kun, nom, tavsif, ikonka, mukofot turi, harbiy unvon, pogondagi yulduzlar)
+    (3, "Omon qolgan", "Tananing shoki ortda. Vaqtida turish va ovozli raport odatga aylanmoqda.", "sprout", "pagon", "Oddiy askar", 1),
+    (7, "Moslashgan", "Tana yangi rejimga moslashdi. Budilnik har kuni oldinga surilmoqda.", "mountain", "medal", "Kichik serjant", 2),
+    (21, "Temir Iroda", "Qat'iy rejim. Odat shakllandi — endi bu sizning hayotingiz.", "shield", "certificate", "Serjant", 3),
+    (40, "Yengilmas / Mentor", "Eng kuchlilar. Keyingi oqimlarda yangilarni tekshirasiz va ustoz bo'lasiz.", "crown", "certificate", "Leytenant", 4),
 ]

@@ -6,7 +6,7 @@ from django.utils.html import format_html
 from apps.control.models import CampSettings
 
 from . import services
-from .models import Cohort, DayRecord, Freeze, Immunity, Membership, Notification, Squad, Strike, Tribe
+from .models import Award, Cohort, DayRecord, Freeze, Immunity, Membership, Notification, Squad, Strike, Tribe, WakeSlot
 
 
 # --- Oqim ------------------------------------------------------------------------
@@ -17,11 +17,16 @@ class TribeInline(admin.TabularInline):
     show_change_link = True
 
 
+class WakeSlotInline(admin.TabularInline):
+    model = WakeSlot
+    extra = 1
+
+
 @admin.register(Cohort)
 class CohortAdmin(admin.ModelAdmin):
     list_display = ("name", "start_date", "end_date", "status", "progress", "members_count")
     list_filter = ("status",)
-    inlines = [TribeInline]
+    inlines = [WakeSlotInline, TribeInline]
     actions = ["open_recruiting", "start", "finish", "run_daily_now"]
     fieldsets = (
         (None, {"fields": ("name", "start_date", "duration_days", "status")}),
@@ -274,6 +279,12 @@ class ImmunityAdmin(admin.ModelAdmin):
     list_filter = ("source",)
     search_fields = ("user__first_name", "user__telegram_username")
     raw_id_fields = ("user", "used_on")
+
+
+@admin.register(Award)
+class AwardAdmin(admin.ModelAdmin):
+    list_display = ("membership", "stage", "issued_at")
+    list_filter = ("stage", "membership__cohort")
 
 
 @admin.register(Freeze)

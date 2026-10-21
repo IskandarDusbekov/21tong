@@ -63,6 +63,12 @@ export const api = {
   createCohort: (body) => request("/cohorts/", { method: "POST", body }),
   updateCohort: (id, body) => request(`/cohorts/${id}/`, { method: "PATCH", body }),
   cohortAction: (id, action) => request(`/cohorts/${id}/action/`, { method: "POST", body: { action } }),
+  addSlot: (cohortId, body) => request(`/cohorts/${cohortId}/slots/`, { method: "POST", body }),
+  updateSlot: (id, body) => request(`/slots/${id}/`, { method: "PATCH", body }),
+  deleteSlot: (id) => request(`/slots/${id}/`, { method: "DELETE" }),
+  // `v` — bosqich o'zgarganda oshadi, shunda faqat o'shanda rasm qayta chiziladi
+  stagePreviewUrl: (id, v = 0) => `/api/panel/stages/${id}/preview.png?v=${v}`,
+  awardUrl: (id) => `/api/panel/awards/${id}.png`,
 
   settings: () => request("/settings/"),
   saveSettings: (body) => request("/settings/", { method: "PUT", body }),

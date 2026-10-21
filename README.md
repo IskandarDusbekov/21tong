@@ -68,9 +68,22 @@ ulanmagan rota guruhlari va tezkor havolalar.
 
 ## Lager qanday ishlaydi
 
-**Ariza.** `/start` → jins → maqsad → hozir turadigan vaqt → maqsad vaqti → tasdiqlash → manifest rasmi.
-Ariza `ADMIN_IDS` dagi adminlarga **"✅ Qabul / ❌ Rad"** tugmalari bilan keladi (yoki `/arizalar`).
-Qabul qilinsa va qabul ochiq oqim bo'lsa, foydalanuvchi o'zi qabila va **7 kishilik rotaga** joylashadi.
+**Oqim va tayyor rotalar.** Admin panelda (Oqimlar) oqim ochiladi va **aniq start sanasi** qo'yiladi
+(masalan 3 kundan keyin). Har oqimga 3–4 ta **tayyor rota vaqti** qo'shiladi, masalan `06:00 → 05:00`.
+"Keyingi oqim (+7 kun)" tugmasi shu vaqtlar bilan har haftalik yangi qabulni bir bosishda ochadi.
+
+**Ariza.** `/start` → ism → familiya → viloyat (ro'yxatdan) → jins → maqsad → **tayyor rotani tanlash** →
+tasdiqlash → storis uchun taklif rasmi ("Yolg'iz bo'lma — rota bo'lib harakat qil", QR-kod bilan).
+Ariza `ADMIN_IDS` dagi adminlarga **"✅ Qabul / ❌ Rad"** tugmalari bilan keladi (yoki panelda / `/arizalar`).
+Qabul qilinganda odam tanlagan rotasiga joylashadi; bot unga start sanasi, birinchi budilnik va
+**yo'riqnoma** yuboradi: raport qayerga va ovozli xabar qanday yuboriladi. Startgacha **mashq raporti**
+yuborib ko'rish mumkin, har kech 20:00 da "Startga N kun qoldi" eslatmasi keladi.
+
+**Mukofotlar.** Har bosqichda bot ism-familiya, viloyat, sana va raqam bilan rasm yuboradi: **pogon** (harbiy
+unvon, yulduzlar bilan), **medal** yoki **sertifikat** — qaysi bosqichga qaysi mukofot berilishini admin tanlaydi
+(Gaplar va bosqichlar). Mukofotlar Mini App'ning "Yo'l" bo'limida ham ko'rinadi.
+
+Do'st taklifi Immunitet bermaydi (sozlamada yoqish mumkin).
 
 **Har tong:**
 
@@ -175,11 +188,15 @@ yoki tez yangilanish uchun `npm run dev` (http://localhost:5173) dan foydalaning
 Mini App'ni Telegram ichida ochish uchun HTTPS manzil kerak (`MINI_APP_URL`). Lokal sinovda shart emas —
 «Uyg'ondim» tugmasi botning o'zida ham bor.
 
-Kunlik jarayon — har kuni ~00:05 da cron/Task Scheduler orqali:
+Kunlik hisob (kechagi kunlarni baholash, start sanasi kelgan oqimni boshlash) — **cron shart emas**:
+bot uni har kecha 00:05 da va har ishga tushganda o'zi chaqiradi. Qo'lda ishga tushirish:
 
 ```bash
 cd backend && ../venv/Scripts/python manage.py run_daily
 ```
+
+Mukofot va taklif rasmlari tizim shriftlari bilan chiziladi (Windows: Segoe UI / Georgia, Linux serverda:
+`fonts-dejavu` paketi). Boshqa shrift ishlatish uchun `.env` da `MANIFEST_FONT_DIR` ni ko'rsating.
 
 Testlar:
 

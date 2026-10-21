@@ -37,9 +37,9 @@ class PhraseAdmin(admin.ModelAdmin):
 
 @admin.register(Stage)
 class StageAdmin(admin.ModelAdmin):
-    list_display = ("day", "name", "description", "icon")
+    list_display = ("day", "name", "award_type", "rank", "stars", "icon")
     list_display_links = ("name",)
-    list_editable = ("day", "icon")
+    list_editable = ("day", "award_type", "rank", "stars", "icon")
 
 
 @admin.register(BotMessage)
@@ -77,7 +77,7 @@ class BotMessageAdmin(admin.ModelAdmin):
     def reset_to_default(self, request, queryset):
         for m in queryset:
             m.text = m.default_text
-            m.save(update_fields=["text", "updated_at"])
+            m.save()
         self.message_user(request, f"{queryset.count()} ta xabar standart matnga qaytarildi.")
 
 

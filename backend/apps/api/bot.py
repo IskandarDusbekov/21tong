@@ -1,4 +1,5 @@
 """Bot -> backend API. Hammasi `X-Bot-Secret` bilan himoyalangan."""
+from django.core.management import call_command
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -8,9 +9,10 @@ from rest_framework.views import APIView
 
 from apps.accounts.auth import IsBot
 from apps.accounts.manifest import render_manifest
-from apps.accounts.models import User
+from apps.accounts.models import Region, User
 from apps.camp import services
-from apps.camp.models import Cohort, DayRecord, Membership, Notification, Squad
+from apps.camp.awards import render_award
+from apps.camp.models import Award, Cohort, DayRecord, Membership, Notification, Squad, WakeSlot
 from apps.control.models import BotMessage, CampSettings
 from apps.proofs import services as proof_services
 from apps.proofs.models import Review
@@ -33,9 +35,12 @@ class BotView(APIView):
 
 def user_payload(user):
     membership = user.memberships.select_related("cohort", "tribe", "squad").order_by("-joined_at").first()
+    upcoming = services.upcoming_membership(user)
     return {
         "telegram_id": user.telegram_id,
-        "name": user.first_name,
+        "name": user.first_name or user.display_name,
+        "full_name": user.display_name,
+        "upcoming": services.placement_payload(upcoming) if upcoming else None,
         "status": user.status,
         "gender": user.gender,
         "goal": user.goal,
@@ -63,6 +68,7 @@ class ConfigView(BotView):
         return Response({
             "settings": {**c.template_vars(), "registration_open": c.registration_open},
             "messages": dict(BotMessage.objects.values_list("key", "text")),
+            "regions": [{"value": v, "label": label} for v, label in Region.choices],
         })
 
 
@@ -73,11 +79,13 @@ class RegisterView(BotView):
         telegram_id, gender, goal = require(request.data, "telegram_id", "gender", "goal")
         current = request.data.get("current_wake_time")
         target = request.data.get("target_wake_time")
+        d = request.data
         user = services.register_user(
             telegram_id=int(telegram_id), gender=gender, goal=goal,
-            username=request.data.get("username", ""),
-            first_name=request.data.get("first_name", ""),
-            referral_code=request.data.get("referral_code"),
+            username=d.get("username", ""),
+            first_name=d.get("first_name", ""), last_name=d.get("last_name", ""), region=d.get("region", ""),
+            slot_id=d.get("slot_id"),
+            referral_code=d.get("referral_code"),
             current_wake_time=parse_time(current, "current_wake_time") if current else None,
             target_wake_time=parse_time(target, "target_wake_time") if target else None,
         )
@@ -121,6 +129,14 @@ class ManifestView(BotView):
         return HttpResponse(render_manifest(user), content_type="image/png")
 
 
+class SlotsView(BotView):
+    """Arizada tanlanadigan tayyor rota vaqtlari."""
+
+    def get(self, request):
+        today = services.local_now().date()
+        return Response([services.slot_json(s, today) for s in services.open_slots()])
+
+
 class RecruitingCohortsView(BotView):
     def get(self, request):
         cohorts = Cohort.objects.filter(status=Cohort.Status.RECRUITING).order_by("start_date")
@@ -129,6 +145,11 @@ class RecruitingCohortsView(BotView):
 
 class JoinView(BotView):
     def post(self, request):
+        if request.data.get("slot_id"):
+            telegram_id, slot_id = require(request.data, "telegram_id", "slot_id")
+            slot = get_object_or_404(WakeSlot, pk=slot_id, is_open=True)
+            m = services.join_slot(self.get_user(telegram_id), slot)
+            return Response(services.placement_payload(m), status=201)
         telegram_id, cohort_id, start, target = require(
             request.data, "telegram_id", "cohort_id", "start_wake_time", "target_wake_time"
         )
@@ -157,7 +178,14 @@ class VoiceView(BotView):
 
     def post(self, request):
         telegram_id, file_id = require(request.data, "telegram_id", "file_id")
-        membership = self.get_active(telegram_id)
+        user = self.get_user(telegram_id)
+        membership = services.active_membership(user)
+        if membership is None:
+            # Oqim hali boshlanmagan — mashq raporti (yangi kelganlar qanday yuborishni o'rganadi)
+            if user.status != User.Status.APPROVED:
+                raise exceptions.ValidationError({"detail": "Avval arizangiz qabul qilinishi kerak."})
+            upcoming = services.upcoming_membership(user)
+            return Response({"practice": True, "upcoming": services.placement_payload(upcoming) if upcoming else None})
         record = services.record_voice(membership, file_id)
         return Response(proof_payload(membership, record), status=201)
 
@@ -242,6 +270,27 @@ class WindowsView(BotView):
             }
             for s in running_squads()
         ])
+
+
+class AwardImageView(BotView):
+    def get(self, request, pk):
+        award = get_object_or_404(Award.objects.select_related("membership__user", "membership__cohort", "stage"), pk=pk)
+        return HttpResponse(render_award(award), content_type="image/png")
+
+
+class CountdownView(BotView):
+    """Startni kutayotganlar — bot har kech "Startga N kun qoldi" yuboradi."""
+
+    def get(self, request):
+        return Response(services.countdown_list())
+
+
+class RunDailyView(BotView):
+    """Kunlik hisob (bot har kecha 00:05 da va ishga tushganda chaqiradi). Idempotent."""
+
+    def post(self, request):
+        call_command("run_daily")
+        return Response({"ok": True})
 
 
 class RollCallView(BotView):

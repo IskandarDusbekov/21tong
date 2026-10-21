@@ -17,6 +17,7 @@ log = logging.getLogger("21tong")
 USER_COMMANDS = [
     BotCommand(command="start", description="Ariza / bosh sahifa"),
     BotCommand(command="holat", description="Mening holatim"),
+    BotCommand(command="yoriqnoma", description="Raport qanday yuboriladi"),
     BotCommand(command="nizom", description="Lager nizomi"),
 ]
 ADMIN_COMMANDS = USER_COMMANDS + [
@@ -45,6 +46,8 @@ async def main():
     except Exception as e:
         raise SystemExit(f"Backend'ga ulanib bo'lmadi ({config.BACKEND_URL}): {e}. Avval runserver'ni ishga tushiring.")
     await texts.refresh(force=True)
+    # Bot o'chiq turgan paytda o'tkazib yuborilgan kunlik hisob bo'lsa — hozir bajariladi (idempotent)
+    await backend.run_daily()
 
     bot = Bot(config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()

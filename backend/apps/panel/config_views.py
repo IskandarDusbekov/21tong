@@ -10,8 +10,11 @@ from django.utils import timezone
 from rest_framework import exceptions, serializers
 from rest_framework.response import Response
 
+from django.http import HttpResponse
+
 from apps.camp import services
-from apps.camp.models import Cohort, Membership, Notification, Squad
+from apps.camp.awards import render_award, render_preview
+from apps.camp.models import Award, Cohort, Membership, Notification, Squad, WakeSlot
 from apps.control import defaults
 from apps.control.models import SETTINGS_GROUPS, BotMessage, Broadcast, CampSettings, Phrase, Stage
 from apps.control.services import broadcast_recipients, send_broadcast
@@ -121,7 +124,7 @@ class PhraseSerializer(serializers.ModelSerializer):
 class StageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Stage
-        fields = ["id", "day", "name", "description", "icon"]
+        fields = ["id", "day", "name", "description", "icon", "award_type", "rank", "stars"]
 
 
 def crud_views(model, serializer_cls):
@@ -155,7 +158,23 @@ StagesView, StageView = crud_views(Stage, StageSerializer)
 
 class StageIconsView(PanelView):
     def get(self, request):
-        return Response([{"value": v, "label": label} for v, label in Stage.Icon.choices])
+        return Response({
+            "icons": [{"value": v, "label": label} for v, label in Stage.Icon.choices],
+            "award_types": [{"value": v, "label": label} for v, label in Stage.AwardType.choices],
+        })
+
+
+class StagePreviewView(PanelView):
+    """Bosqich mukofotining namunaviy rasmi (panelda <img> orqali ko'rsatiladi)."""
+
+    def get(self, request, pk):
+        return HttpResponse(render_preview(get_object_or_404(Stage, pk=pk)), content_type="image/png")
+
+
+class AwardImageView(PanelView):
+    def get(self, request, pk):
+        award = get_object_or_404(Award.objects.select_related("membership__user", "membership__cohort", "stage"), pk=pk)
+        return HttpResponse(render_award(award), content_type="image/png")
 
 
 # --- Oqimlar -------------------------------------------------------------------------
@@ -172,9 +191,34 @@ class CohortSerializer(serializers.ModelSerializer):
         ]
 
 
+class SlotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WakeSlot
+        fields = ["id", "start_wake_time", "target_wake_time", "title", "is_open"]
+
+    def validate(self, attrs):
+        start = attrs.get("start_wake_time", getattr(self.instance, "start_wake_time", None))
+        target = attrs.get("target_wake_time", getattr(self.instance, "target_wake_time", None))
+        if start and target and target > start:
+            raise serializers.ValidationError({"detail": "Maqsad vaqti boshlang'ich vaqtdan erta bo'lishi kerak."})
+        return attrs
+
+
+def slot_row(s):
+    data = SlotSerializer(s).data
+    data["start_wake_time"], data["target_wake_time"] = data["start_wake_time"][:5], data["target_wake_time"][:5]
+    data["members"] = Membership.objects.filter(
+        cohort=s.cohort, tribe__start_wake_time=s.start_wake_time, target_wake_time=s.target_wake_time
+    ).count()
+    data["pending"] = s.applicants.filter(status="pending").count()
+    return data
+
+
 def cohort_json(c, today):
     data = CohortSerializer(c).data
     members = c.memberships
+    data["slots"] = [slot_row(s) for s in c.slots.all()]
+    data["days_left"] = services.days_until(c.start_date, today)
     data.update({
         "day": c.day_number(today),
         "members": members.count(),
@@ -228,6 +272,10 @@ class CohortActionView(PanelView):
             c.status = Cohort.Status.FINISHED
             c.memberships.filter(status=Membership.Status.ACTIVE).update(status=Membership.Status.FINISHED)
             msg = "Oqim yakunlandi."
+        elif action == "clone_next":
+            days = int(request.data.get("days") or 7)
+            new = services.clone_cohort(c, days)
+            return Response({"detail": f"Keyingi oqim ochildi: {new.name} (start {new.start_date:%d.%m.%Y}). Qabulni ochishni unutmang.", "id": new.id})
         elif action == "run_daily":
             call_command("run_daily")
             return Response({"detail": "Kunlik hisob bajarildi: kechagi kunlar baholandi, bugungi kunlar ochildi."})
@@ -235,6 +283,28 @@ class CohortActionView(PanelView):
             raise exceptions.ValidationError({"detail": "Noma'lum amal."})
         c.save(update_fields=["status"])
         return Response({"detail": msg})
+
+
+class SlotsView(PanelView):
+    def post(self, request, pk):
+        cohort = get_object_or_404(Cohort, pk=pk)
+        s = SlotSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        if WakeSlot.objects.filter(cohort=cohort, start_wake_time=s.validated_data["start_wake_time"],
+                                   target_wake_time=s.validated_data["target_wake_time"]).exists():
+            raise exceptions.ValidationError({"detail": "Bunday rota vaqti allaqachon bor."})
+        return Response(slot_row(s.save(cohort=cohort)), status=201)
+
+
+class SlotView(PanelView):
+    def patch(self, request, pk):
+        s = SlotSerializer(get_object_or_404(WakeSlot, pk=pk), data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        return Response(slot_row(s.save()))
+
+    def delete(self, request, pk):
+        get_object_or_404(WakeSlot, pk=pk).delete()
+        return Response(status=204)
 
 
 # --- Ommaviy xabar ---------------------------------------------------------------------

@@ -1,5 +1,7 @@
 // "Yo'l" — 4 bosqich, 21 kunlik kalendar va Kaizen budilnik grafigi.
 import { BedDouble, Check, Crown, Flame, Medal, Mountain, Shield, Snowflake, Sprout, Star, TrendingDown, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { awardImage } from "../api.js";
 import { Empty, ErrorCard, Skeleton } from "../ui.jsx";
 
 // Bosqich ikonkalari admin panelda tanlanadi (control.Stage.icon)
@@ -94,6 +96,26 @@ function Calendar({ days }) {
   );
 }
 
+function AwardCard({ a }) {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    let url;
+    awardImage(a.id).then((u) => { url = u; setSrc(u); }).catch(() => {});
+    return () => url && URL.revokeObjectURL(url);
+  }, [a.id]);
+  return (
+    <a className="award" href={src || undefined} target="_blank" rel="noreferrer">
+      {src ? <img src={src} alt={`${a.stage} — ${a.award}`} /> : <div className="skeleton" style={{ aspectRatio: "4 / 5" }} />}
+      <b>{a.rank || a.stage}</b>
+      <small className="muted">{a.day}-kun · {a.award.split(" (")[0]}</small>
+    </a>
+  );
+}
+
+function Awards({ items }) {
+  return <div className="awards">{items.map((a) => <AwardCard key={a.id} a={a} />)}</div>;
+}
+
 const toMin = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
 
 function KaizenChart({ days, rules, target }) {
@@ -156,6 +178,12 @@ export default function Journey({ me, error }) {
         </div>
       </div>
       <NextStage j={j} />
+      {me.awards?.length > 0 && (
+        <>
+          <div className="section-title">Mukofotlarim</div>
+          <Awards items={me.awards} />
+        </>
+      )}
       <div className="section-title">21 kun</div>
       <Calendar days={j.days} />
       <div className="section-title">Bosqichlar</div>

@@ -9,10 +9,12 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from apps.accounts.models import Gender, User
+from apps.accounts.models import Gender, Region, User
 
 from . import rules
-from .models import Cohort, DayRecord, Freeze, Immunity, Membership, Notification, Squad, Strike, Tribe
+from .models import (
+    Award, Cohort, DayRecord, Freeze, Immunity, Membership, Notification, Squad, Strike, Tribe, WakeSlot,
+)
 
 
 class RuleError(Exception):
@@ -29,19 +31,61 @@ def local_now(now=None):
 
 # --- Onboarding ---------------------------------------------------------------
 
+def days_until(date, today=None):
+    return (date - (today or local_now().date())).days
+
+
+def slot_json(slot, today=None):
+    c = slot.cohort
+    return {
+        "id": slot.id,
+        "label": str(slot),
+        "title": slot.title,
+        "start_wake_time": slot.start_wake_time.strftime("%H:%M"),
+        "target_wake_time": slot.target_wake_time.strftime("%H:%M"),
+        "cohort": {"id": c.id, "name": c.name, "start_date": c.start_date.isoformat(),
+                   "start_label": c.start_date.strftime("%d.%m.%Y"), "days_left": days_until(c.start_date, today)},
+    }
+
+
+def open_slots():
+    """Arizada tanlash mumkin bo'lgan tayyor rota vaqtlari (qabul ochiq oqimlarda)."""
+    return list(
+        WakeSlot.objects.filter(is_open=True, cohort__status=Cohort.Status.RECRUITING)
+        .select_related("cohort").order_by("cohort__start_date", "start_wake_time")
+    )
+
+
+def _clean_name(value, field):
+    value = " ".join((value or "").split())
+    if not 2 <= len(value) <= 30:
+        raise RuleError(f"{field} 2–30 ta harfdan iborat bo'lsin.")
+    return value
+
+
 @transaction.atomic
-def register_user(*, telegram_id, gender, goal, username="", first_name="", referral_code=None,
-                  current_wake_time=None, target_wake_time=None):
+def register_user(*, telegram_id, gender, goal, username="", first_name="", last_name="", region="",
+                  slot_id=None, referral_code=None, current_wake_time=None, target_wake_time=None):
     """Botdagi ariza yakunlanganda chaqiriladi. Jins keyin o'zgarmaydi. Adminlarga xabar ketadi."""
     if gender not in Gender.values:
         raise RuleError("Jins noto'g'ri ko'rsatilgan.")
+    if region and region not in Region.values:
+        raise RuleError("Viloyat noto'g'ri tanlangan.")
     if not rules.current().registration_open and not User.objects.filter(telegram_id=telegram_id).exists():
         raise RuleError("Hozircha ariza qabul qilinmayapti.")
+    slot = None
+    if slot_id:
+        slot = WakeSlot.objects.select_related("cohort").filter(
+            pk=slot_id, is_open=True, cohort__status=Cohort.Status.RECRUITING
+        ).first()
+        if slot is None:
+            raise RuleError("Bu rotaga qabul yopilgan. Boshqasini tanlang.")
+        current_wake_time, target_wake_time = slot.start_wake_time, slot.target_wake_time
     if current_wake_time and target_wake_time and target_wake_time > current_wake_time:
         raise RuleError("Maqsad vaqti hozirgi vaqtdan kech bo'lmasin — biz erta turishga o'rganamiz.")
+
     user, created = User.objects.get_or_create(
-        telegram_id=telegram_id,
-        defaults={"username": f"tg{telegram_id}", "first_name": first_name, "telegram_username": username},
+        telegram_id=telegram_id, defaults={"username": f"tg{telegram_id}", "telegram_username": username},
     )
     if user.gender and user.gender != gender:
         raise RuleError("Jinsni o'zgartirib bo'lmaydi.")
@@ -51,7 +95,12 @@ def register_user(*, telegram_id, gender, goal, username="", first_name="", refe
     user.gender = gender
     user.goal = goal.strip()
     user.telegram_username = username or user.telegram_username
-    user.first_name = first_name or user.first_name
+    if first_name:
+        user.first_name = _clean_name(first_name, "Ism")
+    if last_name:
+        user.last_name = _clean_name(last_name, "Familiya")
+    user.region = region or user.region
+    user.preferred_slot = slot or user.preferred_slot
     user.current_wake_time = current_wake_time or user.current_wake_time
     user.target_wake_time = target_wake_time or user.target_wake_time
     was_pending = user.status == User.Status.PENDING
@@ -68,21 +117,43 @@ def register_user(*, telegram_id, gender, goal, username="", first_name="", refe
 def application_payload(user):
     fmt = lambda t: t.strftime("%H:%M") if t else None  # noqa: E731
     return {
-        "name": user.first_name,
+        "name": user.display_name,
         "username": user.telegram_username,
         "gender": user.gender,
+        "region": user.get_region_display() if user.region else None,
         "goal": user.goal,
+        "slot": str(user.preferred_slot) if user.preferred_slot_id else None,
         "current_wake_time": fmt(user.current_wake_time),
         "target_wake_time": fmt(user.target_wake_time),
         "referred_by": str(user.referred_by) if user.referred_by_id else None,
     }
 
 
+def placement_payload(m):
+    """Qabul qilingan odamga: oqim, start, rota, birinchi budilnik."""
+    c = m.cohort
+    return {
+        "name": m.user.first_name or m.user.display_name,
+        "cohort": c.name,
+        "start_date": c.start_date.strftime("%d.%m.%Y"),
+        "days_left": max(days_until(c.start_date), 0),
+        "tribe": str(m.tribe),
+        "squad": m.squad.name if m.squad_id else "—",
+        "alarm": m.tribe.start_wake_time.strftime("%H:%M"),
+        "target": m.target_wake_time.strftime("%H:%M"),
+        "invite_link": m.squad.invite_link if m.squad_id else "",
+    }
+
+
+def join_slot(user, slot):
+    return join_cohort(user, slot.cohort, slot.start_wake_time, slot.target_wake_time)
+
+
 @transaction.atomic
 def approve_user(user):
     """
-    Admin tasdiqlaydi. Qabul ochiq oqim bo'lsa, arizadagi vaqtlar bilan darhol
-    qabila va rotaga joylashtiriladi. Taklif qilgan do'stga (bir marta) Immunitet beriladi.
+    Admin tasdiqlaydi. Arizada tanlangan tayyor rotaga (yoki qabul ochiq oqimga arizadagi vaqtlar bilan)
+    darhol joylashtiriladi. Sozlamada yoqilgan bo'lsa, taklif qilgan do'stga bir marta Immunitet.
     """
     if user.status != User.Status.PENDING:
         return False
@@ -90,22 +161,18 @@ def approve_user(user):
     user.approved_at = timezone.now()
     user.save(update_fields=["status", "approved_at"])
 
-    payload = {}
-    cohort = Cohort.objects.filter(status=Cohort.Status.RECRUITING).order_by("start_date").first()
-    if cohort and user.current_wake_time and user.target_wake_time:
-        try:
-            m = join_cohort(user, cohort, user.current_wake_time, user.target_wake_time)
-        except RuleError:
-            m = None
-        if m:
-            payload = {
-                "cohort": cohort.name,
-                "start_date": cohort.start_date.isoformat(),
-                "tribe": str(m.tribe),
-                "squad": m.squad.name,
-                "invite_link": m.squad.invite_link,
-            }
-    notify(user, Notification.Kind.APPROVED, **payload)
+    m = None
+    slot = user.preferred_slot
+    try:
+        if slot and slot.cohort.status == Cohort.Status.RECRUITING:
+            m = join_slot(user, slot)
+        else:
+            cohort = Cohort.objects.filter(status=Cohort.Status.RECRUITING).order_by("start_date").first()
+            if cohort and user.current_wake_time and user.target_wake_time:
+                m = join_cohort(user, cohort, user.current_wake_time, user.target_wake_time)
+    except RuleError:
+        m = None
+    notify(user, Notification.Kind.APPROVED, **(placement_payload(m) if m else {}))
 
     # Shartli UPDATE — parallel tasdiqlarda ham Immunitet faqat bir marta beriladi
     if user.referred_by_id and rules.current().referral_immunity:
@@ -457,11 +524,32 @@ def evaluate_day(record: DayRecord):
     if record.status == DayRecord.Status.FAILED:
         issue_strike(membership, reason, day=record)
     else:
-        survived = membership.days.exclude(status__in=[DayRecord.Status.PENDING, DayRecord.Status.FAILED]).count()
+        survived = survived_days(membership)
         stage = rules.stage_for(survived)
         if stage and stage["day"] == survived:
-            notify(membership.user, Notification.Kind.STAGE_UP, **stage)
+            grant_award(membership, stage)
     return record
+
+
+def grant_award(membership, stage):
+    """Bosqich mukofoti (pogon/medal/sertifikat) — bir bosqichga bir marta. Bot rasmini yuboradi."""
+    award, created = Award.objects.get_or_create(membership=membership, stage_id=stage["id"])
+    if created:
+        notify(
+            membership.user, Notification.Kind.STAGE_UP,
+            award_id=award.id, number=award.number, name=membership.user.first_name or membership.user.display_name,
+            stage=stage["name"], day=stage["day"], rank=stage["rank"] or stage["name"], award=stage["award"],
+            description=stage["description"],
+        )
+    return award
+
+
+def award_json(a):
+    return {
+        "id": a.id, "stage": a.stage.name, "day": a.stage.day, "award_type": a.stage.award_type,
+        "award": a.stage.get_award_type_display(), "rank": a.stage.rank, "icon": a.stage.icon,
+        "number": a.number, "issued_at": a.issued_at,
+    }
 
 
 # --- Fors-major ---------------------------------------------------------------
@@ -489,6 +577,44 @@ def request_freeze(membership, reason="", now=None):
 
 def immunities_available(user):
     return Immunity.objects.filter(user=user, used_on__isnull=True).count()
+
+
+# --- Startgacha: kutayotganlar, eslatma, mashq -------------------------------------
+
+def upcoming_membership(user):
+    """Qabul qilingan, lekin oqimi hali boshlanmagan ishtirok."""
+    return (
+        Membership.objects.select_related("cohort", "tribe", "squad", "user")
+        .filter(user=user, status=Membership.Status.ACTIVE, cohort__status=Cohort.Status.RECRUITING)
+        .order_by("cohort__start_date").first()
+    )
+
+
+def countdown_list(today=None):
+    """Har kech yuboriladigan "Startga N kun qoldi" eslatmalari uchun."""
+    today = today or local_now().date()
+    result = []
+    for m in Membership.objects.filter(
+        status=Membership.Status.ACTIVE, cohort__status=Cohort.Status.RECRUITING, cohort__start_date__gt=today,
+    ).select_related("cohort", "tribe", "squad", "user"):
+        result.append({"telegram_id": m.user.telegram_id, **placement_payload(m), "days_left": days_until(m.cohort.start_date, today)})
+    return result
+
+
+@transaction.atomic
+def clone_cohort(cohort, days=7):
+    """Keyingi qabul: shu oqimning oynalari va tayyor rota vaqtlari bilan, start +N kun."""
+    start = cohort.start_date + dt.timedelta(days=days)
+    new = Cohort.objects.create(
+        name=f"{start:%d.%m.%Y} oqimi", start_date=start, duration_days=cohort.duration_days,
+        morning_window_start=cohort.morning_window_start, morning_window_end=cohort.morning_window_end,
+        evening_window_start=cohort.evening_window_start, evening_window_end=cohort.evening_window_end,
+    )
+    WakeSlot.objects.bulk_create([
+        WakeSlot(cohort=new, start_wake_time=s.start_wake_time, target_wake_time=s.target_wake_time, title=s.title)
+        for s in cohort.slots.all()
+    ])
+    return new
 
 
 # --- Rota raporti ---------------------------------------------------------------

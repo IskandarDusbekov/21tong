@@ -11,6 +11,10 @@ bot_patterns = [
     path("users/<int:telegram_id>/reject/", bot.RejectView.as_view()),
     path("users/<int:telegram_id>/manifest.png", bot.ManifestView.as_view()),
     path("cohorts/recruiting/", bot.RecruitingCohortsView.as_view()),
+    path("slots/", bot.SlotsView.as_view()),
+    path("awards/<int:pk>.png", bot.AwardImageView.as_view()),
+    path("countdown/", bot.CountdownView.as_view()),
+    path("run-daily/", bot.RunDailyView.as_view()),
     path("join/", bot.JoinView.as_view()),
     path("wake/", bot.WakeView.as_view()),
     path("voice/", bot.VoiceView.as_view()),
@@ -35,5 +39,6 @@ app_patterns = [
     path("bounties/", miniapp.BountiesView.as_view()),
     path("bounties/<int:pk>/complete/", miniapp.BountyCompleteView.as_view()),
     path("leaderboard/", miniapp.LeaderboardView.as_view()),
+    path("awards/<int:pk>.png", miniapp.AwardImageView.as_view()),
     path("dev/users/", miniapp.DevUsersView.as_view()),
 ]

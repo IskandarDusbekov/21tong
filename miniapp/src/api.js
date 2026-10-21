@@ -47,6 +47,13 @@ async function request(path, { method = "GET", body } = {}) {
   return data;
 }
 
+/** Mukofot rasmi: <img> sarlavha yubora olmaydi, shuning uchun blob URL qilib olamiz. */
+export async function awardImage(id) {
+  const res = await fetch(`${BASE}/awards/${id}.png`, { headers: { Authorization: authHeader() } });
+  if (!res.ok) throw new Error("Rasm yuklanmadi");
+  return URL.createObjectURL(await res.blob());
+}
+
 export const api = {
   me: () => request("/me/"),
   wake: () => request("/wake/", { method: "POST" }),

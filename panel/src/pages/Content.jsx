@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Award, Crown, Flame, Medal, Mountain, Plus, Quote, Shield, Sprout, Star, Trash2 } from "lucide-react";
 import { api } from "../api.js";
-import { ErrorBox, PageHead, Seg, Skeleton, Switch, useAction, useConfirm, useLoad } from "../ui.jsx";
+import { ErrorBox, PageHead, Seg, Skeleton, Stepper, Switch, useAction, useConfirm, useLoad } from "../ui.jsx";
 
 const STAGE_ICONS = { sprout: Sprout, mountain: Mountain, shield: Shield, crown: Crown, flame: Flame, star: Star, medal: Medal };
 
@@ -52,12 +52,15 @@ function Phrases() {
 function Stages() {
   const confirm = useConfirm();
   const { data, error, reload, setData } = useLoad(api.stages);
-  const { data: icons } = useLoad(api.stageIcons);
+  const { data: meta } = useLoad(api.stageIcons);
+  const icons = meta?.icons;
   const [run, busy] = useAction(reload);
+  const [version, setVersion] = useState(0); // o'zgarganda namunaviy rasmni yangilash uchun
+  const [preview, setPreview] = useState(null);
 
   const patch = (s, body) => {
     setData(data.map((x) => (x.id === s.id ? { ...x, ...body } : x)));
-    api.updateStage(s.id, body).catch(reload);
+    api.updateStage(s.id, body).then(() => setVersion((v) => v + 1)).catch(reload);
   };
   const add = () => {
     const day = Math.max(0, ...data.map((s) => s.day)) + 10;
@@ -98,12 +101,44 @@ function Stages() {
                     return <button key={ic.value} type="button" className={s.icon === ic.value ? "on" : ""} title={ic.label} onClick={() => patch(s, { icon: ic.value })}><I size={15} /></button>;
                   })}
                 </div>
+                <div className="row" style={{ flexWrap: "wrap", gap: 8, marginTop: 10, paddingLeft: 12 }}>
+                  <span className="small muted">Mukofot:</span>
+                  <Seg value={s.award_type} onChange={(v) => patch(s, { award_type: v })}
+                    options={(meta?.award_types || []).map((a) => ({ value: a.value, label: a.label.split(" (")[0] }))} />
+                </div>
+                <div className="row" style={{ flexWrap: "wrap", gap: 8, marginTop: 8, paddingLeft: 12 }}>
+                  <span className="small muted">Unvon:</span>
+                  <input className="input" style={{ width: 180 }} defaultValue={s.rank} placeholder="Masalan: Kichik serjant"
+                    onBlur={(e) => e.target.value !== s.rank && patch(s, { rank: e.target.value })} />
+                  {s.award_type === "pagon" && (
+                    <>
+                      <span className="small muted">Yulduzlar:</span>
+                      <Stepper value={s.stars} min={0} max={4} onChange={(v) => patch(s, { stars: v })} />
+                    </>
+                  )}
+                </div>
               </div>
+              <button type="button" className="award-thumb" onClick={() => setPreview(s)} title="Kattaroq ko'rish">
+                <img src={api.stagePreviewUrl(s.id, version)} alt={`${s.name} mukofoti namunasi`} />
+              </button>
               <button className="btn btn-ghost btn-icon" onClick={() => remove(s)} aria-label="O'chirish"><Trash2 size={16} /></button>
             </li>
           );
         })}
       </ul>
+      {preview && (
+        <>
+          <div className="backdrop modal-backdrop" onClick={() => setPreview(null)} />
+          <div className="card modal" style={{ width: "min(560px, calc(100vw - 32px))", padding: 14 }} role="dialog" aria-modal="true">
+            <div className="row-between" style={{ marginBottom: 10 }}>
+              <h2>{preview.name} — namuna</h2>
+              <button className="btn btn-ghost btn-sm" onClick={() => setPreview(null)}>Yopish</button>
+            </div>
+            <img src={api.stagePreviewUrl(preview.id, version)} alt="" style={{ width: "100%", borderRadius: 10, display: "block" }} />
+            <p className="muted small" style={{ margin: "10px 0 0" }}>Ishtirokchi shu bosqichga yetganda bot unga o'z ismi, viloyati, sanasi va raqami bilan shunday rasm yuboradi.</p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

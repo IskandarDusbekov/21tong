@@ -55,8 +55,9 @@ class CampSettings(models.Model):
     sunday_rest = models.BooleanField("Yakshanba — dam olish kuni", default=True,
                                       help_text="Yakshanba bajarmaganlarga ogohlantirish berilmaydi.")
     sunday_immunity = models.BooleanField("Yakshanba bajarganlarga Immunitet", default=True)
-    referral_immunity = models.BooleanField("Do'st taklifi uchun Immunitet", default=True,
-                                            help_text="Havola orqali kelgan do'st qabul qilinsa, taklif qilganga bir marta.")
+    referral_immunity = models.BooleanField("Do'st taklifi uchun Immunitet", default=False,
+                                            help_text="Yoqilsa: havola orqali kelgan do'st qabul qilinganda taklif qilganga bir marta. "
+                                                      "Standart o'chiq — aks holda Immunitetlar ko'payib ketadi.")
     freezes_per_cohort = minutes(1, 0, 10, verbose_name="Oqimda nechta muzlatish (kasallik)")
     freeze_allowed_from = models.TimeField("Muzlatishni qaysi vaqtdan bosish mumkin", default=dt.time(18, 0),
                                            help_text="Faqat shu vaqtdan keyin, ertangi kun uchun.")
@@ -164,10 +165,18 @@ class Stage(models.Model):
         STAR = "star", "Yulduz"
         MEDAL = "medal", "Medal"
 
+    class AwardType(models.TextChoices):
+        PAGON = "pagon", "Pogon (harbiy unvon)"
+        MEDAL = "medal", "Medal"
+        CERTIFICATE = "certificate", "Sertifikat"
+
     day = models.PositiveSmallIntegerField("Nechanchi kundan keyin", unique=True)
     name = models.CharField("Nomi", max_length=60)
     description = models.CharField("Tavsif", max_length=250, blank=True)
     icon = models.CharField("Ikonka", max_length=16, choices=Icon.choices, default=Icon.STAR)
+    award_type = models.CharField("Mukofot turi", max_length=16, choices=AwardType.choices, default=AwardType.MEDAL)
+    rank = models.CharField("Harbiy unvon", max_length=40, blank=True, help_text="Masalan: «Kichik serjant». Pogon va sertifikatda yoziladi.")
+    stars = models.PositiveSmallIntegerField("Pogondagi yulduzlar", default=1, validators=[MaxValueValidator(4)])
 
     class Meta:
         verbose_name = "Bosqich"
@@ -190,6 +199,8 @@ class BotMessage(models.Model):
     group = models.CharField("Bo'lim", max_length=20, editable=False)
     title = models.CharField("Qayerda ishlatiladi", max_length=100, editable=False)
     text = models.TextField("Matn")
+    # Admin o'zgartirmagan xabarlar dastur yangilanganda yangi standart matnga o'tadi
+    customized = models.BooleanField("Admin o'zgartirgan", default=False, editable=False)
     updated_at = models.DateTimeField("O'zgartirilgan", auto_now=True)
 
     class Meta:
@@ -222,16 +233,25 @@ class BotMessage(models.Model):
     def render(self, **values):
         return self.text.format_map(_SafeVars(values))
 
+    def save(self, *args, **kwargs):
+        self.customized = self.text != self.default_text
+        super().save(*args, **kwargs)
+
     @classmethod
     def sync_defaults(cls):
-        """Yangi kalitlarni qo'shadi; mavjud matnlarga tegmaydi (admin o'zgartirgan bo'lishi mumkin)."""
+        """
+        Yangi kalitlarni qo'shadi, eskirganlarini o'chiradi. Admin o'zgartirmagan matnlar yangi standartga
+        o'tadi; admin o'zgartirganlariga tegilmaydi.
+        """
         existing = set(cls.objects.values_list("key", flat=True))
         cls.objects.bulk_create([
             cls(key=k, group=g, title=t, text=txt)
             for k, (g, t, _, txt) in defaults.MESSAGES.items() if k not in existing
         ])
-        for k, (g, t, _, _) in defaults.MESSAGES.items():
+        cls.objects.exclude(key__in=defaults.MESSAGES.keys()).delete()
+        for k, (g, t, _, txt) in defaults.MESSAGES.items():
             cls.objects.filter(key=k).exclude(group=g, title=t).update(group=g, title=t)
+            cls.objects.filter(key=k, customized=False).exclude(text=txt).update(text=txt)
 
 
 class Broadcast(models.Model):

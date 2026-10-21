@@ -11,8 +11,9 @@ class PanelView(APIView):
 def person(user):
     return {
         "id": user.id,
-        "name": user.first_name or user.telegram_username or user.username,
+        "name": user.display_name,
         "username": user.telegram_username,
+        "region": user.get_region_display() if user.region else "",
         "telegram_id": user.telegram_id,
         "gender": user.gender,
     }

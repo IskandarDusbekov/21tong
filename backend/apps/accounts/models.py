@@ -13,6 +13,24 @@ class Gender(models.TextChoices):
     FEMALE = "F", "Qiz"
 
 
+class Region(models.TextChoices):
+    TASHKENT_CITY = "tashkent_city", "Toshkent shahri"
+    TASHKENT = "tashkent", "Toshkent viloyati"
+    ANDIJAN = "andijan", "Andijon"
+    BUKHARA = "bukhara", "Buxoro"
+    FERGANA = "fergana", "Farg'ona"
+    JIZZAKH = "jizzakh", "Jizzax"
+    KHOREZM = "khorezm", "Xorazm"
+    NAMANGAN = "namangan", "Namangan"
+    NAVOI = "navoi", "Navoiy"
+    KASHKADARYA = "kashkadarya", "Qashqadaryo"
+    KARAKALPAKSTAN = "karakalpakstan", "Qoraqalpog'iston"
+    SAMARKAND = "samarkand", "Samarqand"
+    SIRDARYA = "sirdarya", "Sirdaryo"
+    SURKHANDARYA = "surkhandarya", "Surxondaryo"
+    ABROAD = "abroad", "Xorijda"
+
+
 class User(AbstractUser):
     """
     Platforma foydalanuvchisi. Telegram orqali keladi, shuning uchun parol shart emas.
@@ -30,8 +48,13 @@ class User(AbstractUser):
     telegram_id = models.BigIntegerField("Telegram ID", unique=True, null=True, blank=True)
     telegram_username = models.CharField("Telegram username", max_length=64, blank=True)
     gender = models.CharField("Jins", max_length=1, choices=Gender.choices, blank=True)
+    region = models.CharField("Viloyat", max_length=20, choices=Region.choices, blank=True)
     goal = models.TextField("Maqsad", blank=True)
-    # Arizada ko'rsatilgan vaqtlar — tasdiqlanganda oqimga shu vaqtlar bilan joylashtiriladi
+    # Arizada tanlangan tayyor rota vaqti — tasdiqlanganda shu vaqt bilan rotaga joylashtiriladi
+    preferred_slot = models.ForeignKey(
+        "camp.WakeSlot", null=True, blank=True, on_delete=models.SET_NULL, related_name="applicants",
+        verbose_name="Tanlagan rota vaqti",
+    )
     current_wake_time = models.TimeField("Hozir turadigan vaqti", null=True, blank=True)
     target_wake_time = models.TimeField("Maqsad qilgan vaqti", null=True, blank=True)
     status = models.CharField("Ariza holati", max_length=16, choices=Status.choices, default=Status.NEW)
@@ -53,3 +76,7 @@ class User(AbstractUser):
         if self.telegram_username:
             return f"@{self.telegram_username}"
         return self.get_full_name() or self.username
+
+    @property
+    def display_name(self):
+        return self.get_full_name() or self.first_name or self.telegram_username or self.username

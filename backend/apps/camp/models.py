@@ -45,6 +45,31 @@ class Cohort(models.Model):
         return n if 1 <= n <= self.duration_days else None
 
 
+class WakeSlot(models.Model):
+    """
+    Tayyor rota vaqti — admin oqim uchun oldindan 3–4 tasini yaratadi (masalan "06:00 → 05:00").
+    Foydalanuvchi arizada shulardan birini tanlaydi; budilnik shu vaqtga moslashadi.
+    """
+
+    cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name="slots", verbose_name="Oqim")
+    start_wake_time = models.TimeField("Boshlang'ich uyg'onish")
+    target_wake_time = models.TimeField("Maqsad uyg'onish")
+    title = models.CharField("Nomi", max_length=60, blank=True, help_text="Masalan: «Erta qushlar». Bo'sh bo'lsa vaqt ko'rsatiladi.")
+    is_open = models.BooleanField("Tanlash mumkin", default=True)
+
+    class Meta:
+        ordering = ["start_wake_time", "target_wake_time"]
+        verbose_name = "Rota vaqti"
+        verbose_name_plural = "Rota vaqtlari"
+        constraints = [
+            models.UniqueConstraint(fields=["cohort", "start_wake_time", "target_wake_time"], name="unique_slot")
+        ]
+
+    def __str__(self):
+        label = f"{self.start_wake_time:%H:%M} → {self.target_wake_time:%H:%M}"
+        return f"{self.title} ({label})" if self.title else label
+
+
 class Tribe(models.Model):
     """
     Qabila — bir xil boshlang'ich uyg'onish vaqtidagi, bir jinsdagi ishtirokchilar.
@@ -217,6 +242,27 @@ class Immunity(models.Model):
 
     def __str__(self):
         return f"Immunitet ({self.get_source_display()}) — {self.user}"
+
+
+class Award(models.Model):
+    """Bosqichga yetganda beriladigan mukofot (pogon, medal yoki sertifikat). Raqami o'zgarmaydi."""
+
+    membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="awards", verbose_name="Ishtirokchi")
+    stage = models.ForeignKey("control.Stage", on_delete=models.PROTECT, related_name="awards", verbose_name="Bosqich")
+    issued_at = models.DateTimeField("Berilgan", auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["membership", "stage"], name="one_award_per_stage")]
+        ordering = ["stage__day"]
+        verbose_name = "Mukofot"
+        verbose_name_plural = "Mukofotlar"
+
+    def __str__(self):
+        return f"{self.membership.user} — {self.stage}"
+
+    @property
+    def number(self):
+        return f"21T-{self.issued_at:%y}-{self.pk:05d}"
 
 
 class Notification(models.Model):

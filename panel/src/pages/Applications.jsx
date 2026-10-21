@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlarmClock, Check, Gift, Inbox, Target, X } from "lucide-react";
+import { AlarmClock, Check, Gift, Inbox, MapPin, Target, X } from "lucide-react";
 import { api } from "../api.js";
 import { Avatar, Empty, ErrorBox, GENDER, PageHead, Pill, Seg, Skeleton, fmtAgo, useAction, useConfirm, useLoad } from "../ui.jsx";
 
@@ -23,10 +23,12 @@ function ApplicationCard({ a, onDone }) {
             <h2>{a.name}</h2>
             {a.username && <span className="muted">@{a.username}</span>}
             <Pill tone={a.gender === "F" ? "info" : "mute"}>{GENDER[a.gender] || "—"}</Pill>
+            {a.region && <Pill><MapPin size={11} /> {a.region}</Pill>}
             {a.status !== "pending" && <Pill tone={STATUS_TONE[a.status]} dot>{a.status_label}</Pill>}
           </div>
           <div className="row small muted" style={{ flexWrap: "wrap", gap: 14, marginTop: 6 }}>
             <span className="row" style={{ gap: 5 }}><AlarmClock size={14} /> <b style={{ color: "var(--text)" }} className="num">{a.current_wake_time || "—"}</b> → <b style={{ color: "var(--sun-text)" }} className="num">{a.target_wake_time || "—"}</b></span>
+            {a.slot_cohort && <span>rota: {a.slot_cohort}</span>}
             {a.referred_by && <span className="row" style={{ gap: 5 }}><Gift size={14} /> taklif qilgan: {a.referred_by}</span>}
             <span>{fmtAgo(a.created_at)}</span>
           </div>

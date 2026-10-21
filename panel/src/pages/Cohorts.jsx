@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { CalendarPlus, CalendarRange, DoorOpen, Flag, Pencil, Play, RefreshCw } from "lucide-react";
+import { CalendarPlus, CalendarRange, CopyPlus, DoorOpen, Flag, Pencil, Play, Plus, RefreshCw, Timer, Trash2 } from "lucide-react";
 import { api } from "../api.js";
-import { Drawer, Empty, ErrorBox, PageHead, Pill, Skeleton, fmtDate, useAction, useConfirm, useLoad } from "../ui.jsx";
+import { Drawer, Empty, ErrorBox, PageHead, Pill, Skeleton, Switch, fmtDate, useAction, useConfirm, useLoad } from "../ui.jsx";
 
 const STATUS_TONE = { recruiting: "sun", running: "ok", finished: "mute" };
 const hm = (t) => (t || "").slice(0, 5);
@@ -39,6 +39,56 @@ function CohortForm({ initial, onSave, onClose, busy }) {
         </div>
       </form>
     </Drawer>
+  );
+}
+
+/** Tayyor rota vaqtlari — foydalanuvchi arizada shulardan birini tanlaydi. */
+function Slots({ cohort, onChanged }) {
+  const confirm = useConfirm();
+  const [form, setForm] = useState({ start_wake_time: "06:00", target_wake_time: "05:00", title: "" });
+  const [run, busy] = useAction(onChanged);
+  const add = (e) => {
+    e.preventDefault();
+    run(() => api.addSlot(cohort.id, form), "Rota vaqti qo'shildi.");
+  };
+  const remove = async (s) => {
+    if (await confirm({ title: "Rota vaqtini o'chirasizmi?", text: `${s.start_wake_time} → ${s.target_wake_time}. Allaqachon joylashganlar o'z rotasida qoladi.`, confirm: "O'chirish", danger: true })) {
+      run(() => api.deleteSlot(s.id), "O'chirildi.");
+    }
+  };
+  return (
+    <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+      <div className="row-between" style={{ marginBottom: 8 }}>
+        <div><h3>Tayyor rotalar</h3><div className="muted small">Arizada foydalanuvchi shulardan birini tanlaydi — budilnigi shunga moslashadi.</div></div>
+      </div>
+      {cohort.slots.length === 0 && (
+        <div className="alert tone-warn" style={{ marginBottom: 10 }}>Rota vaqti yo'q — foydalanuvchilar ariza oxirida tanlay olmaydi. 3–4 ta qo'shing.</div>
+      )}
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 10 }}>
+        {cohort.slots.map((s) => (
+          <div key={s.id} className="card card-pad" style={{ padding: "12px 14px", opacity: s.is_open ? 1 : 0.55, boxShadow: "none" }}>
+            <div className="row-between">
+              <b className="num" style={{ fontSize: 18 }}>{s.start_wake_time} <span style={{ color: "var(--sun)" }}>→</span> {s.target_wake_time}</b>
+              <button className="btn btn-ghost btn-icon" onClick={() => remove(s)} aria-label="O'chirish"><Trash2 size={15} /></button>
+            </div>
+            {s.title && <div className="small" style={{ fontWeight: 600 }}>{s.title}</div>}
+            <div className="row-between small muted" style={{ marginTop: 6 }}>
+              <span>{s.members} joylashgan · {s.pending} ariza</span>
+              <span className="row" style={{ gap: 6 }}>{s.is_open ? "ochiq" : "yopiq"}
+                <Switch on={s.is_open} onChange={(v) => run(() => api.updateSlot(s.id, { is_open: v }))} label="Tanlash mumkin" />
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <form className="row" style={{ flexWrap: "wrap", gap: 8, marginTop: 10 }} onSubmit={add}>
+        <input type="time" className="input" style={{ width: 120 }} value={form.start_wake_time} onChange={(e) => setForm({ ...form, start_wake_time: e.target.value })} aria-label="Boshlang'ich vaqt" />
+        <span className="muted">→</span>
+        <input type="time" className="input" style={{ width: 120 }} value={form.target_wake_time} onChange={(e) => setForm({ ...form, target_wake_time: e.target.value })} aria-label="Maqsad vaqti" />
+        <input className="input" style={{ flex: "1 1 160px" }} placeholder="Nomi (ixtiyoriy), masalan «Erta qushlar»" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        <button className="btn btn-outline" disabled={busy}><Plus size={15} /> Rota qo'shish</button>
+      </form>
+    </div>
   );
 }
 
@@ -92,6 +142,11 @@ export default function Cohorts() {
                     <span className="small num"><b>{c.day}</b>/{c.duration_days}-kun</span>
                   </div>
                 )}
+                {c.status === "recruiting" && (
+                  <div style={{ marginTop: 8 }}>
+                    <Pill tone="sun"><Timer size={12} /> {c.days_left > 0 ? `Startga ${c.days_left} kun qoldi` : "Bugun start"}</Pill>
+                  </div>
+                )}
               </div>
               <div className="row" style={{ gap: 18 }}>
                 <div><b className="num" style={{ fontSize: 18 }}>{c.active}</b><div className="muted small">faol</div></div>
@@ -100,6 +155,11 @@ export default function Cohorts() {
               </div>
               <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => setEditing(c)}><Pencil size={14} /> Tahrirlash</button>
+                <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => action(c, "clone_next", {
+                  title: "Keyingi oqimni ochasizmi?",
+                  text: `Start ${fmtDate(c.start_date)} dan 7 kun keyin. Shu oqimning chat oynalari va rota vaqtlari ko'chiriladi.`,
+                  confirm: "Ochish",
+                })}><CopyPlus size={14} /> Keyingi oqim (+7 kun)</button>
                 {c.status !== "recruiting" && (
                   <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => action(c, "open")}><DoorOpen size={14} /> Qabulni ochish</button>
                 )}
@@ -115,6 +175,7 @@ export default function Cohorts() {
                 )}
               </div>
             </div>
+            {c.status !== "finished" && <Slots cohort={c} onChanged={reload} />}
           </div>
         ))}
       </div>

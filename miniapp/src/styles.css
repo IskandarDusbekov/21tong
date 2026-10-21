@@ -240,6 +240,12 @@ button:disabled { cursor: default; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 10px; height: 10px; border-radius: 3px; }
 
+.awards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.award { display: block; background: var(--surface); border-radius: var(--radius); padding: 8px 8px 10px; box-shadow: var(--shadow); text-decoration: none; color: var(--text); }
+.award img { display: block; width: 100%; height: auto; border-radius: 12px; margin-bottom: 8px; }
+.award b { display: block; font-size: 14px; padding: 0 4px; }
+.award small { display: block; padding: 0 4px; }
+
 .kaizen svg { display: block; width: 100%; height: auto; overflow: visible; }
 
 /* ---------- Lenta ---------- */

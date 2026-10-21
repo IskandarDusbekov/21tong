@@ -12,7 +12,7 @@ from api import backend
 
 log = logging.getLogger(__name__)
 
-_config = {"settings": {}, "messages": {}, "loaded_at": 0.0}
+_config = {"settings": {}, "messages": {}, "regions": [], "loaded_at": 0.0}
 REFRESH_SECONDS = 30
 
 
@@ -26,13 +26,18 @@ async def refresh(force=False):
         return
     try:
         data = await backend.config()
-        _config.update(settings=data["settings"], messages=data["messages"], loaded_at=time.monotonic())
+        _config.update(settings=data["settings"], messages=data["messages"], regions=data.get("regions", []),
+                       loaded_at=time.monotonic())
     except Exception as e:  # backend vaqtincha ishlamasa — oxirgi matnlar bilan davom etamiz
         log.warning("Bot xabarlarini yangilab bo'lmadi: %s", e)
 
 
 def setting(name, default=None):
     return _config["settings"].get(name, default)
+
+
+def regions():
+    return _config["regions"]
 
 
 class _Vars(dict):
@@ -56,23 +61,53 @@ GENDER = {"M": "Yigit", "F": "Qiz"}
 # --- Ariza ------------------------------------------------------------------------
 
 
+def slot_label(s):
+    label = f"{s['start_wake_time']} → {s['target_wake_time']}"
+    return label + (f" · {s['title']}" if s.get("title") else "")
+
+
 def application_summary(d):
-    return t("application_summary", gender=GENDER[d["gender"]], goal=escape(d["goal"]),
-             current=d["current"], target=d["target"])
+    slot = d["slot"]
+    return t(
+        "application_summary", full_name=escape(f"{d['first_name']} {d['last_name']}"),
+        region=escape(d["region_label"]), gender=GENDER[d["gender"]], goal=escape(d["goal"]),
+        slot=escape(slot_label(slot)), start_date=slot["cohort"]["start_label"],
+    )
+
+
+def ask_slot(slots):
+    c = slots[0]["cohort"]
+    return t("ask_slot", cohort=escape(c["name"]), start_date=c["start_label"], days_left=c["days_left"])
 
 
 def approved(p):
     if not p.get("squad"):
         return t("approved_waiting")
     invite = t("invite_link", link=p["invite_link"]) if p.get("invite_link") else t("invite_pending")
-    return t("approved", cohort=escape(p["cohort"]), start_date=p["start_date"], tribe=escape(p["tribe"]),
-             squad=p["squad"], invite=invite)
+    return t("approved", name=escape(p.get("name", "")), cohort=escape(p["cohort"]), start_date=p["start_date"],
+             days_left=p.get("days_left", ""), tribe=escape(p["tribe"]), squad=p["squad"],
+             alarm=p.get("alarm", ""), target=p.get("target", ""), invite=invite)
+
+
+def practice(p):
+    up = p.get("upcoming")
+    if not up:
+        return t("practice_waiting")
+    return t("practice_ok", start_date=up["start_date"], days_left=up["days_left"], alarm=up["alarm"])
+
+
+def countdown(r):
+    if r["days_left"] <= 1:
+        return t("countdown_tomorrow", alarm=r["alarm"], squad=r["squad"])
+    return t("countdown", days_left=r["days_left"], start_date=r["start_date"], squad=r["squad"], alarm=r["alarm"])
 
 
 def welcome_back(user):
     m = user.get("membership")
     if not m:
         return t("approved_waiting")
+    if user.get("upcoming"):
+        return countdown(user["upcoming"])
     return t("welcome_back", name=escape(user.get("name") or "Jangchi"), tribe=escape(m["tribe"]),
              squad=m["squad"] or "—", strikes=m["strikes"], immunities=user["immunities"])
 
@@ -122,8 +157,9 @@ def immunity_granted(source):
     return t(f"immunity_{source}") if source in ("referral", "sunday", "admin") else t("immunity_admin")
 
 
-def stage_up(p):
-    return t("stage_up", name=escape(p["name"]), day=p["day"], description=escape(p.get("description") or ""))
+def award_caption(p):
+    return t("award_caption", name=escape(p["name"]), stage=escape(p["stage"]), day=p["day"], rank=escape(p["rank"]),
+             award=escape(p["award"]), description=escape(p.get("description") or ""), number=p["number"])
 
 
 # --- Rota guruhi --------------------------------------------------------------------
@@ -154,8 +190,8 @@ def new_application(p, telegram_id):
     return (
         "📥 <b>YANGI ARIZA</b>\n\n"
         f"Kim: {who}\nID: <code>{telegram_id}</code>\n"
-        f"Jins: {GENDER.get(p.get('gender'), '—')}\n"
-        f"Turadi: {p.get('current_wake_time') or '—'} → maqsad {p.get('target_wake_time') or '—'}\n"
+        f"Jins: {GENDER.get(p.get('gender'), '—')} · {escape(p.get('region') or '—')}\n"
+        f"Rota: {escape(p.get('slot') or '—')}\n"
         f"Maqsad: <i>{escape(p.get('goal') or '')}</i>{ref}"
     )
 

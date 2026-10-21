@@ -11,7 +11,7 @@ def seed(apps, schema_editor):
         Phrase.objects.bulk_create([Phrase(text=t) for t in defaults.PHRASES])
     if not Stage.objects.exists():
         Stage.objects.bulk_create([
-            Stage(day=day, name=name, description=desc, icon=icon) for day, name, desc, icon in defaults.STAGES
+            Stage(day=day, name=name, description=desc, icon=icon) for day, name, desc, icon, *_ in defaults.STAGES
         ])
     CampSettings.objects.get_or_create(pk=1)
 

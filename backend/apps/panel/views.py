@@ -124,6 +124,8 @@ def application(u):
     return {
         **person(u),
         "goal": u.goal,
+        "slot": str(u.preferred_slot) if u.preferred_slot_id else None,
+        "slot_cohort": u.preferred_slot.cohort.name if u.preferred_slot_id else None,
         "status": u.status,
         "status_label": u.get_status_display(),
         "current_wake_time": hhmm(u.current_wake_time),
@@ -137,7 +139,7 @@ def application(u):
 class ApplicationsView(PanelView):
     def get(self, request):
         status = request.query_params.get("status", User.Status.PENDING)
-        qs = User.objects.filter(telegram_id__isnull=False).select_related("referred_by").order_by("-date_joined")
+        qs = User.objects.filter(telegram_id__isnull=False).select_related("referred_by", "preferred_slot__cohort").order_by("-date_joined")
         if status != "all":
             qs = qs.filter(status=status)
         counts = dict(User.objects.filter(telegram_id__isnull=False).values_list("status").annotate(n=Count("id")))
@@ -210,6 +212,7 @@ class MemberDetailView(PanelView):
                  "at": s.created_at, "revoked": s.revoked, "immunity": s.cancelled_by_immunity}
                 for s in strikes
             ],
+            "awards": [services.award_json(a) for a in m.awards.select_related("stage")],
             "immunities_list": [
                 {"id": i.id, "source": i.get_source_display(), "at": i.granted_at, "used": bool(i.used_on_id)}
                 for i in Immunity.objects.filter(user=m.user).order_by("-granted_at")

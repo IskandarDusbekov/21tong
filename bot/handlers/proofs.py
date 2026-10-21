@@ -40,7 +40,11 @@ async def voice(message: Message):
     try:
         p = await backend.voice(message.from_user.id, message.voice.file_id)
     except ApiError as e:
+        if e.status == 404:
+            return await message.answer(texts.t("not_registered"))
         return await message.answer(f"⛔ {e.detail}")
+    if p.get("practice"):
+        return await message.answer(texts.practice(p))
     await message.answer(texts.t("voice_ok", day=p["day_number"]))
     await announce(message.bot, p, message)
 

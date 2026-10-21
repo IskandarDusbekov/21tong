@@ -16,7 +16,7 @@ from apps.accounts.models import User
 from apps.camp import rules, services
 from django.core.cache import cache
 
-from apps.camp.models import Cohort, DayRecord, Immunity, Membership, Notification, Strike
+from apps.camp.models import Cohort, DayRecord, Immunity, Membership, Notification, Strike, WakeSlot
 from apps.control.models import BotMessage, CampSettings
 from apps.community import services as community
 from apps.proofs import services as proofs
@@ -100,11 +100,17 @@ class OnboardingTests(CampTestCase):
         with self.assertRaises(services.RuleError):
             services.register_user(telegram_id=1, gender="M", goal="x")
 
-    def test_referral_immunity_given_once_on_friend_approval(self):
+    def test_referral_gives_no_immunity_by_default(self):
+        a = services.register_user(telegram_id=1, gender="M", goal="x")
+        b = services.register_user(telegram_id=2, gender="M", goal="x", referral_code=a.referral_code)
+        services.approve_user(b)
+        self.assertEqual(services.immunities_available(a), 0)
+
+    def test_referral_immunity_once_when_enabled(self):
+        set_rules(referral_immunity=True)
         a = services.register_user(telegram_id=1, gender="M", goal="x")
         b = services.register_user(telegram_id=2, gender="M", goal="x", referral_code=a.referral_code)
         c = services.register_user(telegram_id=3, gender="F", goal="x", referral_code=a.referral_code)
-        self.assertEqual(services.immunities_available(a), 0)
         services.approve_user(b)
         services.approve_user(c)
         self.assertEqual(services.immunities_available(a), 1)
@@ -491,3 +497,107 @@ class BotConfigApiTests(CampTestCase):
         data = APIClient().get("/api/bot/config/", HTTP_X_BOT_SECRET="s3cret").json()
         self.assertEqual(data["settings"]["voice_deadline"], 7)
         self.assertIn("{phrase}", data["messages"]["order_voice"])
+
+
+PNG = bytes([0x89]) + b"PNG"
+
+
+class SlotsAwardsCountdownTests(CampTestCase):
+    def setUp(self):
+        super().setUp()
+        self.cohort.status = Cohort.Status.RECRUITING
+        self.cohort.save()
+        self.slot = WakeSlot.objects.create(cohort=self.cohort, start_wake_time=dt.time(6), target_wake_time=dt.time(5))
+
+    def apply(self, tg, gender="M", **kw):
+        return services.register_user(
+            telegram_id=tg, gender=gender, goal="Erta turish", first_name="Ali", last_name="Valiyev",
+            region="samarkand", slot_id=self.slot.id, **kw,
+        )
+
+    def test_application_with_slot_places_into_slot_time(self):
+        u = self.apply(10)
+        self.assertEqual((u.last_name, u.region, u.preferred_slot_id), ("Valiyev", "samarkand", self.slot.id))
+        services.approve_user(u)
+        m = Membership.objects.get(user=u)
+        self.assertEqual((m.tribe.start_wake_time, m.target_wake_time), (dt.time(6), dt.time(5)))
+        payload = Notification.objects.get(user=u, kind="approved").payload
+        self.assertEqual((payload["alarm"], payload["target"], payload["name"]), ("06:00", "05:00", "Ali"))
+
+    def test_closed_slot_and_bad_input_rejected(self):
+        self.slot.is_open = False
+        self.slot.save()
+        with self.assertRaises(services.RuleError):
+            self.apply(11)
+        with self.assertRaises(services.RuleError):
+            services.register_user(telegram_id=12, gender="M", goal="x", region="mars")
+        with self.assertRaises(services.RuleError):
+            services.register_user(telegram_id=13, gender="M", goal="x", first_name="A")
+
+    def test_countdown_and_upcoming(self):
+        u = self.apply(10)
+        services.approve_user(u)
+        today = MONDAY - dt.timedelta(days=3)
+        rows = services.countdown_list(today)
+        self.assertEqual((rows[0]["telegram_id"], rows[0]["days_left"], rows[0]["alarm"]), (10, 3, "06:00"))
+        self.assertIsNotNone(services.upcoming_membership(u))
+
+    def test_award_on_stage_and_images_render(self):
+        m = self.make_member(1)
+        for i in range(3):
+            day = MONDAY + dt.timedelta(days=i)
+            self.complete_morning(m, day)
+            services.evaluate_day(services.ensure_day_record(m, day))
+        award = m.awards.get()
+        self.assertEqual(award.stage.day, 3)
+        n = Notification.objects.get(user=m.user, kind="stage_up")
+        self.assertEqual((n.payload["award_id"], n.payload["rank"]), (award.id, "Oddiy askar"))
+        from apps.camp.awards import render_award, render_preview
+        from apps.control.models import Stage
+        self.assertTrue(render_award(award).startswith(PNG))
+        for stage in Stage.objects.all():
+            self.assertTrue(render_preview(stage).startswith(PNG))
+        # Takroriy chaqiruv ikkinchi mukofot bermaydi
+        services.grant_award(m, rules.stage_for(3))
+        self.assertEqual(m.awards.count(), 1)
+
+    def test_invite_image_renders(self):
+        from apps.accounts.manifest import render_manifest
+        self.assertTrue(render_manifest(self.apply(10)).startswith(PNG))
+
+    def test_clone_cohort_next_week(self):
+        new = services.clone_cohort(self.cohort)
+        self.assertEqual(new.start_date, self.cohort.start_date + dt.timedelta(days=7))
+        self.assertEqual(new.slots.get().start_wake_time, dt.time(6))
+
+    def test_bot_messages_follow_new_defaults_unless_customized(self):
+        BotMessage.objects.filter(key="guide").update(text="eski standart")  # admin o'zgartirmagan holat
+        custom = BotMessage.objects.get(key="rules")
+        custom.text = "Bizning nizom"
+        custom.save()
+        BotMessage.sync_defaults()
+        guide = BotMessage.objects.get(key="guide")
+        self.assertEqual(guide.text, guide.default_text)
+        self.assertEqual(BotMessage.objects.get(key="rules").text, "Bizning nizom")
+
+
+@override_settings(BOT_API_SECRET="s3cret")
+class BotSlotsApiTests(CampTestCase):
+    def test_bot_flow_slots_register_practice(self):
+        self.cohort.status = Cohort.Status.RECRUITING
+        self.cohort.save()
+        WakeSlot.objects.create(cohort=self.cohort, start_wake_time=dt.time(6), target_wake_time=dt.time(5))
+        client = APIClient()
+        client.credentials(HTTP_X_BOT_SECRET="s3cret")
+        slots = client.get("/api/bot/slots/").json()
+        self.assertEqual(slots[0]["start_wake_time"], "06:00")
+        client.post("/api/bot/users/register/", {
+            "telegram_id": 20, "gender": "F", "goal": "Erta turish", "first_name": "Laylo", "last_name": "Karimova",
+            "region": "fergana", "slot_id": slots[0]["id"],
+        }, format="json")
+        user = client.post("/api/bot/users/20/approve/").json()
+        self.assertEqual(user["upcoming"]["alarm"], "06:00")
+        practice = client.post("/api/bot/voice/", {"telegram_id": 20, "file_id": "f"}, format="json").json()
+        self.assertTrue(practice["practice"])
+        self.assertEqual(len(client.get("/api/bot/countdown/").json()), 1)
+        self.assertIn("regions", client.get("/api/bot/config/").json())

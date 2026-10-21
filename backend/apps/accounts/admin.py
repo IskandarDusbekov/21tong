@@ -9,14 +9,14 @@ from .models import User
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ("__str__", "first_name", "telegram_id", "gender", "status", "wake_times", "short_goal", "date_joined")
-    list_filter = ("status", "gender", "is_staff")
+    list_display = ("__str__", "first_name", "last_name", "region", "gender", "status", "wake_times", "short_goal", "date_joined")
+    list_filter = ("status", "gender", "region", "is_staff")
     search_fields = ("username", "first_name", "telegram_username", "telegram_id", "goal")
     actions = ["approve", "reject", "give_immunity"]
     fieldsets = (
         ("Ariza", {"fields": (
-            "first_name", "telegram_id", "telegram_username", "gender", "goal",
-            "current_wake_time", "target_wake_time", "status", "approved_at",
+            "first_name", "last_name", "region", "telegram_id", "telegram_username", "gender", "goal",
+            "preferred_slot", "current_wake_time", "target_wake_time", "status", "approved_at",
         )}),
         ("Taklif", {"fields": ("referral_code", "referred_by", "referral_immunity_granted")}),
         ("Admin panelga kirish", {"classes": ("collapse",), "fields": (

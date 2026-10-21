@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   AlarmClock, Ban, BedDouble, Check, CheckCircle2, Clock, Coins, Hourglass, Lock, Megaphone, Mic,
-  Moon, Send, ShieldCheck, Snowflake, Sun, Sunrise, Users, Video, XCircle,
+  Moon, Send, ShieldCheck, Snowflake, Sun, Sunrise, Timer, Users, Video, XCircle,
 } from "lucide-react";
 import { api } from "../api.js";
 import { Avatar, Empty, ErrorCard, Sheet, Skeleton, useAction, useLoad } from "../ui.jsx";
@@ -227,9 +227,60 @@ const DAY_BANNERS = {
 
 function NoMembership({ status }) {
   if (status === "pending") {
-    return <Empty icon={Clock} title="Anketangiz ko'rib chiqilmoqda" text="Admin tasdiqlagach, botda /join orqali oqimga qo'shilasiz." />;
+    return <Empty icon={Clock} title="Arizangiz ko'rib chiqilmoqda" text="Tasdiqlangach, rotangiz va start sanasi shu yerda chiqadi." />;
   }
-  return <Empty icon={Sunrise} title="Siz hozir faol oqimda emassiz" text="Botda /join buyrug'i orqali yangi oqimga qo'shiling." />;
+  return <Empty icon={Sunrise} title="Siz hozir faol oqimda emassiz" text="Botda /join buyrug'i orqali yangi oqimdagi rotani tanlang." />;
+}
+
+const GUIDE = [
+  { icon: AlarmClock, title: "Bot uyg'otadi", text: (u) => `Budilnik ${u.alarm} da «TURISH!» xabari keladi.` },
+  { icon: Sun, title: "«Uyg'ondim» tugmasi", text: (u) => `Xabar ostidagi tugmani ${u.rules.wake_grace} daqiqa ichida bosing.` },
+  { icon: Mic, title: "Ovozli raport", text: (u) => `Bot bergan gapni ${u.rules.voice_deadline} daqiqa ichida botga ovozli xabar qilib yuboring: 🎙 tugmasini bosib turing, o'qing, qo'yib yuboring.` },
+  { icon: CheckCircle2, title: "Tamom", text: () => "Bot «Raport qabul qilindi» deydi va rotangizga e'lon qiladi." },
+];
+
+/** Qabul qilingan, lekin oqim hali boshlanmagan: sanoq, rota, yo'riqnoma. */
+function Upcoming({ u, me }) {
+  return (
+    <div>
+      <section className="hero">
+        <div className="hero-top">
+          <span><b>{u.squad}</b> · {u.tribe}</span>
+          <span className="chip"><Timer size={14} />Start {u.start_date}</span>
+        </div>
+        <div className="hero-main">
+          <div className="ring" aria-label={`Startga ${u.days_left} kun`}>
+            <div className="ring-label" style={{ position: "static", height: 96, width: 96, borderRadius: "50%", border: "7px solid rgb(255 255 255 / 16%)" }}>
+              <b className="num">{u.days_left}</b><span>kun qoldi</span>
+            </div>
+          </div>
+          <div>
+            <div className="hero-alarm-label"><AlarmClock size={15} />Birinchi budilnik</div>
+            <div className="hero-alarm num">{u.alarm}</div>
+            <div className="hero-sub">Maqsad <b className="num">{u.target}</b> · {u.cohort}</div>
+          </div>
+        </div>
+      </section>
+      <div className="section-title">Har tong nima qilasiz</div>
+      <ol className="chain card">
+        {GUIDE.map((g, i) => (
+          <li key={i} className="link active">
+            <div className="link-icon"><g.icon size={20} /></div>
+            <div className="link-body"><div className="link-title">{i + 1}. {g.title}</div><div className="link-hint">{g.text(u)}</div></div>
+          </li>
+        ))}
+      </ol>
+      <div className="banner rest" style={{ marginTop: 12 }}>
+        <div className="banner-icon"><Mic size={22} /></div>
+        <div><b>Hozir mashq qiling</b><small className="muted">Botga istalgan ovozli xabar yuboring — bot «Mashq qabul qilindi» deydi.</small></div>
+      </div>
+      <div className="banner ok" style={{ marginTop: 10 }}>
+        <div className="banner-icon"><Users size={22} /></div>
+        <div><b>Yolg'iz bo'lma</b><small className="muted">Do'stingizni ham chaqiring — birga erta turish osonroq.</small></div>
+      </div>
+      {me.awards?.length > 0 && <div className="section-title">Mukofotlaringiz «Yo'l» bo'limida</div>}
+    </div>
+  );
 }
 
 export default function Today({ me, error, reload }) {
@@ -238,6 +289,7 @@ export default function Today({ me, error, reload }) {
 
   if (error && !me) return <ErrorCard text={error} />;
   if (!me) return <div className="stack"><Skeleton height={190} /><Skeleton height={86} /><Skeleton height={230} /></div>;
+  if (me.upcoming) return <Upcoming u={me.upcoming} me={me} />;
   if (!me.membership || !me.journey) return <NoMembership status={me.status} />;
 
   const t = me.today;

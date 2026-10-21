@@ -124,8 +124,8 @@ DEV_LOGIN = DEBUG and env_bool("DEV_LOGIN", True)
 MINIAPP_DIST = BASE_DIR.parent / "miniapp" / "dist"
 # Boshqaruv paneli build'i (`panel/` da `npm run build`) — DEBUG da http://localhost:8000/panel/
 PANEL_DIST = BASE_DIR.parent / "panel" / "dist"
-# Manifest rasmi uchun TTF shrift (bo'sh bo'lsa Pillow standart shrifti)
-MANIFEST_FONT_PATH = os.getenv("MANIFEST_FONT_PATH", "")
+# Mukofot va taklif rasmlari uchun TTF shriftlar papkasi (bo'sh bo'lsa tizim shriftlari qidiriladi)
+MANIFEST_FONT_DIR = os.getenv("MANIFEST_FONT_DIR", "")
 # Bot -> backend so'rovlari uchun umumiy maxfiy kalit (X-Bot-Secret sarlavhasi)
 BOT_API_SECRET = os.getenv("BOT_API_SECRET", "dev-bot-secret")
 # Mini App initData amal qilish muddati (soniya)

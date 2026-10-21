@@ -72,7 +72,8 @@ def approval_threshold(assigned: int) -> int:
 
 def stages():
     return [
-        {"code": s.icon, "name": s.name, "day": s.day, "description": s.description, "icon": s.icon}
+        {"id": s.id, "code": s.icon, "name": s.name, "day": s.day, "description": s.description, "icon": s.icon,
+         "award_type": s.award_type, "award": s.get_award_type_display(), "rank": s.rank, "stars": s.stars}
         for s in Stage.objects.all()
     ]
 
