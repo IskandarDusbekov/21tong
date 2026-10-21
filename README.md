@@ -65,6 +65,27 @@ cd backend && ../venv/Scripts/python -m pip install -r requirements.txt && ../ve
 cd backend && ../venv/Scripts/python manage.py runserver
 ```
 
+### Telegram'siz brauzerda ko'rish (Dev kirish)
+
+`DEBUG=true` bo'lganda Mini App'ni oddiy brauzerda, demo foydalanuvchi sifatida ochish mumkin:
+
+```bash
+cd miniapp && npm install && npm run build
+```
+
+```bash
+cd backend && ../venv/Scripts/python manage.py seed_demo
+```
+
+Keyin `runserver` ni ishga tushiring va oching:
+
+- http://localhost:8000/ — Mini App, "🛠 Dev kirish" ekranidan foydalanuvchi tanlanadi
+- http://localhost:8000/admin/ — admin panel (`createsuperuser` bilan yaratilgan login)
+
+Dev kirish `Authorization: dev <telegram_id>` sarlavhasi orqali ishlaydi va `DEBUG=false` da
+(yoki `DEV_LOGIN=false`) butunlay o'chadi. Mini App kodi o'zgarsa — `npm run build` ni qayta bajaring
+yoki tez yangilanish uchun `npm run dev` (http://localhost:5173) dan foydalaning.
+
 Bot (`.env` da `TELEGRAM_BOT_TOKEN` kerak):
 
 ```bash

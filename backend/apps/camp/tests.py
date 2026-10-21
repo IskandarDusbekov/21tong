@@ -232,6 +232,16 @@ class ApiTests(CampTestCase):
         png = client.get("/api/bot/users/7/manifest.png", HTTP_X_BOT_SECRET="s3cret")
         self.assertEqual(png["Content-Type"], "image/png")
 
+    def test_dev_login_only_when_enabled(self):
+        self.make_member(42)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION="dev 42")
+        with override_settings(DEV_LOGIN=True):
+            self.assertEqual(client.get("/api/app/me/").status_code, 200)
+        with override_settings(DEV_LOGIN=False):
+            self.assertIn(client.get("/api/app/me/").status_code, (401, 403))
+            self.assertEqual(client.get("/api/app/dev/users/").status_code, 404)
+
     def test_miniapp_wake(self):
         m = self.make_member(42)
         client = APIClient()

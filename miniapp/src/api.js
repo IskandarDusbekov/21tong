@@ -1,15 +1,45 @@
-// Backend bilan aloqa. Har so'rovga Telegram imzolagan initData qo'shiladi.
+// Backend bilan aloqa. Telegram ichida har so'rovga imzolangan initData qo'shiladi;
+// oddiy brauzerda (lokal ishlab chiqish) — tanlangan demo foydalanuvchining telegram_id si.
 const BASE = (import.meta.env.VITE_API_URL || "") + "/api/app";
+const DEV_KEY = "21tong.devUser";
 
 export const tg = window.Telegram?.WebApp;
+export const inTelegram = Boolean(tg?.initData);
+
+export const devUser = {
+  get() {
+    try {
+      return JSON.parse(localStorage.getItem(DEV_KEY));
+    } catch {
+      return null;
+    }
+  },
+  set(user) {
+    try {
+      localStorage.setItem(DEV_KEY, JSON.stringify(user));
+    } catch {
+      /* private rejim — sessiya davomida qayta tanlanadi */
+    }
+  },
+  clear() {
+    try {
+      localStorage.removeItem(DEV_KEY);
+    } catch {
+      /* e'tiborsiz */
+    }
+  },
+};
+
+function authHeader() {
+  if (inTelegram) return `tma ${tg.initData}`;
+  const dev = devUser.get();
+  return dev ? `dev ${dev.telegram_id}` : "";
+}
 
 async function request(path, { method = "GET", body } = {}) {
   const res = await fetch(BASE + path, {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `tma ${tg?.initData || ""}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: authHeader() },
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
@@ -27,4 +57,5 @@ export const api = {
   bounties: () => request("/bounties/"),
   completeBounty: (id) => request(`/bounties/${id}/complete/`, { method: "POST" }),
   leaderboard: () => request("/leaderboard/"),
+  devUsers: () => request("/dev/users/"),
 };

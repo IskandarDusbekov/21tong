@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, tg } from "./api.js";
+import { api, devUser, inTelegram, tg } from "./api.js";
 
 const TABS = [
   { id: "today", label: "Bugun", icon: "☀️" },
@@ -24,9 +24,21 @@ function useLoad(fn) {
 
 export default function App() {
   const [tab, setTab] = useState("today");
+  const [dev, setDev] = useState(() => (inTelegram ? null : devUser.get()));
+
+  if (!inTelegram && !dev) {
+    return <DevLogin onPick={(u) => { devUser.set(u); setDev(u); }} />;
+  }
+
   return (
     <div className="app">
-      <main>
+      {dev && (
+        <div className="devbar">
+          <span>🛠 Dev: <b>{dev.name}</b> ({dev.gender === "F" ? "qiz" : "yigit"})</span>
+          <button onClick={() => { devUser.clear(); setDev(null); }}>Almashtirish</button>
+        </div>
+      )}
+      <main key={dev?.telegram_id}>
         {tab === "today" && <Today />}
         {tab === "feed" && <Feed />}
         {tab === "bounty" && <Bounties />}
@@ -40,6 +52,27 @@ export default function App() {
           </button>
         ))}
       </nav>
+    </div>
+  );
+}
+
+function DevLogin({ onPick }) {
+  const { data, error } = useLoad(api.devUsers);
+  const statusLabel = { pending: "tasdiq kutmoqda", approved: "", rejected: "rad etilgan", new: "yangi" };
+  return (
+    <div className="app">
+      <h2>🛠 Dev kirish</h2>
+      <p className="muted">
+        Telegram'siz lokal ko'rish uchun. Kim sifatida kirasiz? Ro'yxat bo'sh bo'lsa:{" "}
+        <code>python manage.py seed_demo</code>
+      </p>
+      {error && <p className="error">{error}</p>}
+      {data?.map((u) => (
+        <button key={u.telegram_id} className="card devuser" onClick={() => onPick(u)}>
+          <span>{u.gender === "F" ? "👩" : "👨"} {u.name}</span>
+          <small>{statusLabel[u.status] || ""} · {u.telegram_id}</small>
+        </button>
+      ))}
     </div>
   );
 }

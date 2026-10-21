@@ -1,11 +1,14 @@
-"""Telegram Mini App API. Foydalanuvchi initData orqali aniqlanadi."""
+"""Telegram Mini App API. Foydalanuvchi initData (yoki lokal dev kirish) orqali aniqlanadi."""
+from django.conf import settings
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import exceptions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.auth import TelegramInitDataAuthentication
+from apps.accounts.auth import DevAuthentication, TelegramInitDataAuthentication
+from apps.accounts.models import User
 from apps.camp import rules, services
 from apps.community import services as community
 from apps.community.models import Bounty, Reflection
@@ -14,7 +17,7 @@ from .common import membership_summary
 
 
 class AppView(APIView):
-    authentication_classes = [TelegramInitDataAuthentication]
+    authentication_classes = [TelegramInitDataAuthentication, DevAuthentication]
     permission_classes = [IsAuthenticated]
 
     def membership(self):
@@ -104,6 +107,24 @@ class BountyCompleteView(AppView):
         m = self.membership()
         community.complete_bounty(m, get_object_or_404(Bounty, pk=pk), request.data.get("note", ""))
         return Response({"coins": community.coin_balance(m.user)}, status=201)
+
+
+class DevUsersView(APIView):
+    """Dev kirish ekrani uchun foydalanuvchilar ro'yxati. Faqat DEV_LOGIN yoqilganda."""
+
+    def get(self, request):
+        if not settings.DEV_LOGIN:
+            raise Http404
+        users = User.objects.filter(telegram_id__isnull=False).order_by("gender", "first_name")
+        return Response([
+            {
+                "telegram_id": u.telegram_id,
+                "name": u.first_name or u.username,
+                "gender": u.gender,
+                "status": u.status,
+            }
+            for u in users
+        ])
 
 
 class LeaderboardView(AppView):

@@ -54,6 +54,27 @@ class TelegramInitDataAuthentication(authentication.BaseAuthentication):
         return self.keyword
 
 
+class DevAuthentication(authentication.BaseAuthentication):
+    """
+    Faqat lokal ishlab chiqish uchun: `Authorization: dev <telegram_id>`.
+    Mini App'ni Telegram'siz, oddiy brauzerda ko'rish imkonini beradi.
+    DEV_LOGIN o'chiq bo'lsa (production'da DEBUG=false) umuman ishlamaydi.
+    """
+
+    keyword = "dev"
+
+    def authenticate(self, request):
+        if not settings.DEV_LOGIN:
+            return None
+        header = request.headers.get("Authorization", "")
+        if not header.startswith(self.keyword + " "):
+            return None
+        user = User.objects.filter(telegram_id=header[len(self.keyword) + 1:].strip() or None).first()
+        if user is None:
+            raise exceptions.AuthenticationFailed("Dev: bunday telegram_id li foydalanuvchi yo'q.")
+        return user, None
+
+
 class IsBot(permissions.BasePermission):
     def has_permission(self, request, view):
         secret = request.headers.get("X-Bot-Secret", "")

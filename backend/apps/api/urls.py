@@ -26,4 +26,5 @@ app_patterns = [
     path("bounties/", miniapp.BountiesView.as_view()),
     path("bounties/<int:pk>/complete/", miniapp.BountyCompleteView.as_view()),
     path("leaderboard/", miniapp.LeaderboardView.as_view()),
+    path("dev/users/", miniapp.DevUsersView.as_view()),
 ]

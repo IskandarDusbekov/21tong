@@ -115,6 +115,10 @@ REST_FRAMEWORK = {
 # --- Telegram integratsiyasi ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
+# Telegram'siz brauzerda kirish (Mini App'da "Dev kirish" ekrani). Hech qachon production'da yoqmang!
+DEV_LOGIN = DEBUG and env_bool("DEV_LOGIN", True)
+# `npm run build` natijasi — DEV_LOGIN yoqilgan bo'lsa runserver uni "/" da ko'rsatadi
+MINIAPP_DIST = BASE_DIR.parent / "miniapp" / "dist"
 # Manifest rasmi uchun TTF shrift (bo'sh bo'lsa Pillow standart shrifti)
 MANIFEST_FONT_PATH = os.getenv("MANIFEST_FONT_PATH", "")
 # Bot -> backend so'rovlari uchun umumiy maxfiy kalit (X-Bot-Secret sarlavhasi)
