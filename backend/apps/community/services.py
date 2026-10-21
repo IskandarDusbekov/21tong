@@ -27,14 +27,17 @@ def add_reflection(membership, text, now=None):
     return reflection
 
 
+def _visible(membership):
+    """Lenta faqat o'z rotasi ichida (rota bo'lmasa — o'z oqimi va jinsi)."""
+    if membership.squad_id:
+        return Q(membership__squad=membership.squad_id)
+    return Q(membership__cohort=membership.cohort, membership__tribe__gender=membership.tribe.gender)
+
+
 def feed(membership, date):
-    """Lenta: faqat o'z oqimi va o'z jinsidagilarning refleksiyalari."""
+    """Lenta: rotadoshlarning bugungi refleksiyalari."""
     return (
-        Reflection.objects.filter(
-            membership__cohort=membership.cohort,
-            membership__tribe__gender=membership.tribe.gender,
-            date=date,
-        )
+        Reflection.objects.filter(_visible(membership), date=date)
         .select_related("membership__user")
         .annotate(
             fire_count=Count("fires"),
@@ -44,10 +47,9 @@ def feed(membership, date):
 
 
 def give_fire(membership, reflection: Reflection):
-    r = reflection.membership
-    if r.cohort_id != membership.cohort_id or r.tribe.gender != membership.tribe.gender:
+    if not Reflection.objects.filter(_visible(membership), pk=reflection.pk).exists():
         raise RuleError("Bu refleksiya sizga ko'rinmaydi.")
-    if r.pk == membership.pk:
+    if reflection.membership_id == membership.pk:
         raise RuleError("O'zingizga olov bera olmaysiz.")
     fire, _ = Fire.objects.get_or_create(reflection=reflection, membership=membership)
     return fire

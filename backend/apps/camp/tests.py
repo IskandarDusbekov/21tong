@@ -20,6 +20,7 @@ from apps.proofs.models import VideoProof
 
 TZ = ZoneInfo("Asia/Tashkent")
 MONDAY = dt.date(2026, 11, 2)
+DAY8 = MONDAY + dt.timedelta(days=7)  # dushanba, 8-kun: budilnik surilgan, video talab qilinadi
 
 
 def at(date, h, m=0):
@@ -61,12 +62,16 @@ class CampTestCase(TestCase):
         self.cohort.save()
         return m
 
-    def complete_morning(self, m, date, video=True):
-        alarm = services.ensure_day_record(m, date).alarm_time
-        services.press_wake(m, at(date, alarm.hour, alarm.minute))
-        services.record_voice(m, at(date, 7, 1))
-        if video:
-            return proofs.submit_video(m, f"file-{m.id}-{date}", 10, at(date, 7, 3))
+    def complete_morning(self, m, date, proof=True):
+        """Uyg'ondim + kunga mos raport (1–6 kun: ovoz, 7-kundan: video)."""
+        record = services.ensure_day_record(m, date)
+        woke = at(date, record.alarm_time.hour, record.alarm_time.minute)
+        services.press_wake(m, woke)
+        if not proof:
+            return None
+        if rules.video_required(record.day_number):
+            return proofs.submit_video(m, f"file-{m.id}-{date}", 10, woke + dt.timedelta(minutes=3))
+        return services.record_voice(m, f"voice-{m.id}", woke + dt.timedelta(minutes=1))
 
 
 class OnboardingTests(CampTestCase):
@@ -106,7 +111,7 @@ class ReviewTests(CampTestCase):
 
     def test_two_of_three_approve(self):
         members = [self.make_member(i) for i in range(1, 5)]
-        proof = self.complete_morning(members[0], MONDAY)
+        proof = self.complete_morning(members[0], DAY8)
         reviews = list(proof.reviews.select_related("reviewer"))
         proofs.cast_vote(reviews[0], reviews[0].reviewer, True)
         proof.refresh_from_db()
@@ -117,7 +122,7 @@ class ReviewTests(CampTestCase):
 
     def test_cannot_vote_on_others_review(self):
         members = [self.make_member(i) for i in range(1, 5)]
-        proof = self.complete_morning(members[0], MONDAY)
+        proof = self.complete_morning(members[0], DAY8)
         review = proof.reviews.first()
         with self.assertRaises(services.RuleError):
             proofs.cast_vote(review, members[0], True)
@@ -129,22 +134,27 @@ class EvaluationTests(CampTestCase):
 
     def test_completed_day(self):
         m = self.make_member(1)
-        self.complete_morning(m, MONDAY, video=False)
+        self.complete_morning(m, MONDAY)
         self.assertEqual(self.evaluate(m, MONDAY).status, DayRecord.Status.COMPLETED)
 
     def test_late_wake_gives_strike(self):
         m = self.make_member(1)
         services.press_wake(m, at(MONDAY, 7, 20))
-        services.record_voice(m, at(MONDAY, 7, 21))
+        services.record_voice(m, "v", at(MONDAY, 7, 21))
         record = self.evaluate(m, MONDAY)
         self.assertEqual(record.status, DayRecord.Status.FAILED)
         self.assertEqual(m.strikes.get().reason, Strike.Reason.LATE)
 
+    def test_missing_voice_before_day7(self):
+        m = self.make_member(1)
+        self.complete_morning(m, MONDAY, proof=False)
+        self.evaluate(m, MONDAY)
+        self.assertEqual(m.strikes.get().reason, Strike.Reason.NO_VOICE)
+
     def test_missing_video_after_day7(self):
         m = self.make_member(1)
-        day8 = MONDAY + dt.timedelta(days=7)  # 7-kun yakshanba, shuning uchun 8-kun (dushanba)
-        self.complete_morning(m, day8, video=False)
-        self.evaluate(m, day8)
+        self.complete_morning(m, DAY8, proof=False)
+        self.evaluate(m, DAY8)
         self.assertEqual(m.strikes.get().reason, Strike.Reason.NO_VIDEO)
 
     def test_three_strikes_out(self):
@@ -183,6 +193,79 @@ class EvaluationTests(CampTestCase):
         self.assertEqual(self.evaluate(m, tuesday).status, DayRecord.Status.FROZEN)
         with self.assertRaises(services.RuleError):
             services.request_freeze(m, now=at(tuesday, 21))
+
+
+class CampDisciplineTests(CampTestCase):
+    def test_squads_of_seven(self):
+        members = [self.make_member(i) for i in range(1, 9)]
+        self.assertEqual({m.squad.number for m in members[:7]}, {1})
+        self.assertEqual(members[7].squad.number, 2)
+        self.assertEqual(members[7].squad.tribe_id, members[0].tribe_id)
+        girl = self.make_member(100, "F")
+        self.assertEqual(girl.squad.number, 1)
+        self.assertNotEqual(girl.squad_id, members[0].squad_id)
+
+    def test_reviewers_prefer_own_squad(self):
+        members = [self.make_member(i) for i in range(1, 15)]  # 2 ta to'liq rota
+        proof = self.complete_morning(members[0], DAY8)
+        squads = {r.reviewer.squad_id for r in proof.reviews.select_related("reviewer")}
+        self.assertEqual(squads, {members[0].squad_id})
+
+    def test_wake_gives_phrase_and_proof_kind(self):
+        m = self.make_member(1)
+        record = services.press_wake(m, at(MONDAY, 7, 0))
+        self.assertIn(record.phrase, rules.PHRASES)
+        progress = services.day_progress(record)
+        self.assertEqual(progress["proof_kind"], "voice")
+        self.assertEqual(progress["proof_deadline"], "07:30")
+
+    def test_proof_requires_wake_and_right_kind(self):
+        m = self.make_member(1)
+        with self.assertRaises(services.RuleError):
+            services.record_voice(m, "v", at(MONDAY, 7, 1))  # "Uyg'ondim" bosilmagan
+        services.press_wake(m, at(MONDAY, 7, 0))
+        with self.assertRaises(services.RuleError):
+            proofs.submit_video(m, "f", 10, at(MONDAY, 7, 2))  # 1-kun — video emas, ovoz
+        services.press_wake(m, at(DAY8, 6, 50))
+        with self.assertRaises(services.RuleError):
+            services.record_voice(m, "v", at(DAY8, 6, 52))  # 8-kun — ovoz emas, video
+
+    def test_proof_deadline(self):
+        m = self.make_member(1)
+        services.press_wake(m, at(MONDAY, 7, 0))
+        with self.assertRaises(services.RuleError):
+            services.record_voice(m, "v", at(MONDAY, 7, 31))
+
+    def test_application_notifies_admins_and_approval_joins_squad(self):
+        user = services.register_user(
+            telegram_id=55, gender="F", goal="Erta turish", first_name="Dilnoza",
+            current_wake_time=dt.time(7, 0), target_wake_time=dt.time(5, 30),
+        )
+        app = Notification.objects.get(user=user, kind="new_application")
+        self.assertEqual(app.payload["current_wake_time"], "07:00")
+        services.approve_user(user)
+        m = Membership.objects.get(user=user)
+        self.assertEqual(m.squad.number, 1)
+        self.assertEqual(m.target_wake_time, dt.time(5, 30))
+        approved = Notification.objects.get(user=user, kind="approved")
+        self.assertEqual(approved.payload["squad"], "1-rota")
+
+    def test_squad_report(self):
+        a, b, c = self.make_member(1), self.make_member(2), self.make_member(3)
+        self.complete_morning(a, MONDAY)
+        self.complete_morning(b, MONDAY, proof=False)
+        report = services.squad_report(a.squad, MONDAY)
+        statuses = {r["telegram_id"]: r["status"] for r in report["members"]}
+        self.assertEqual(statuses, {1: "done", 2: "woke", 3: "absent"})
+        self.assertEqual((report["done"], report["total"]), (1, 3))
+
+    def test_strike_announced_to_squad(self):
+        m = self.make_member(1)
+        m.squad.telegram_chat_id = -100123
+        m.squad.save()
+        services.evaluate_day(services.ensure_day_record(m, MONDAY))
+        n = Notification.objects.get(user=m.user, kind="strike")
+        self.assertEqual(n.payload["squad_chat_id"], -100123)
 
 
 class CommunityTests(CampTestCase):
@@ -236,7 +319,7 @@ class ApiTests(CampTestCase):
         m = self.make_member(1)
         for i in range(3):
             day = MONDAY + dt.timedelta(days=i)
-            self.complete_morning(m, day, video=False)
+            self.complete_morning(m, day)
             services.evaluate_day(services.ensure_day_record(m, day))
         j = services.journey(m, at(MONDAY + dt.timedelta(days=3), 21))
         self.assertEqual(j["survived"], 3)
@@ -259,6 +342,18 @@ class ApiTests(CampTestCase):
         with override_settings(DEV_LOGIN=False):
             self.assertIn(client.get("/api/app/me/").status_code, (401, 403))
             self.assertEqual(client.get("/api/app/dev/users/").status_code, 404)
+
+    def test_bot_admin_approve_and_wake(self):
+        client = APIClient()
+        client.credentials(HTTP_X_BOT_SECRET="s3cret")
+        client.post("/api/bot/users/register/", {
+            "telegram_id": 9, "gender": "M", "goal": "Erta turish", "first_name": "Ali",
+            "current_wake_time": "07:00", "target_wake_time": "05:30",
+        }, format="json")
+        self.assertEqual(len(client.get("/api/bot/users/pending/").json()), 1)
+        resp = client.post("/api/bot/users/9/approve/")
+        self.assertEqual(resp.json()["membership"]["squad"], "1-rota")
+        self.assertEqual(client.post("/api/bot/users/9/approve/").status_code, 400)
 
     def test_miniapp_wake(self):
         m = self.make_member(42)

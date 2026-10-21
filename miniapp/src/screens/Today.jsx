@@ -1,10 +1,10 @@
 import { useState } from "react";
 import {
-  AlarmClock, BedDouble, Check, CheckCircle2, Clock, Coins, Hourglass, Lock, Mic,
-  Moon, Snowflake, Spade, Sun, Sunrise, Video, XCircle,
+  AlarmClock, Ban, BedDouble, Check, CheckCircle2, Clock, Coins, Hourglass, Lock, Megaphone, Mic,
+  Moon, Send, Snowflake, Spade, Sun, Sunrise, Users, Video, XCircle,
 } from "lucide-react";
 import { api } from "../api.js";
-import { Empty, ErrorCard, Sheet, Skeleton, useAction } from "../ui.jsx";
+import { Avatar, Empty, ErrorCard, Sheet, Skeleton, useAction, useLoad } from "../ui.jsx";
 import { STAGE_ICONS } from "./Journey.jsx";
 
 function DayRing({ day, total }) {
@@ -40,7 +40,7 @@ function Hero({ me }) {
   return (
     <section className="hero">
       <div className="hero-top">
-        <span>{m.tribe}</span>
+        <span>{m.squad ? <><b>{m.squad}</b> · </> : null}{m.tribe}</span>
         <span className="chip"><StageIcon size={14} />{j.stage ? j.stage.name : "Yangi boshlovchi"}</span>
       </div>
       <div className="hero-main">
@@ -124,42 +124,97 @@ function Link({ icon: Icon, state, title, tag, hint, children }) {
 }
 
 function Chain({ t, gender, rules }) {
-  const videoState = !t.video_required
-    ? "locked"
-    : t.video === "approved" ? "done"
-    : t.video === "rejected" ? "failed"
-    : t.voice ? "active" : "locked";
-  const videoTag = !t.video_required
-    ? <span className="tag">{rules.video_from_day}-kundan</span>
-    : t.video === "reviewing" ? <span className="tag sun"><Hourglass size={11} /> Tekshirilmoqda</span>
-    : t.video === "rejected" ? <span className="tag bad">Rad etildi</span>
+  const isVideo = t.proof_kind === "video";
+  const proofState = !t.woke ? "locked"
+    : isVideo ? (t.video === "approved" ? "done" : t.video === "rejected" ? "failed" : "active")
+    : t.voice ? "done" : "active";
+  const proofTag = isVideo && t.video === "reviewing" ? <span className="tag sun"><Hourglass size={11} /> Rota tekshirmoqda</span>
+    : isVideo && t.video === "rejected" ? <span className="tag bad">Rad etildi</span>
+    : !t.proof_done ? <span className="tag num">{t.proof_deadline} gacha</span>
     : null;
 
   return (
     <ol className="chain card">
       <Link
         icon={Sun} state={t.woke ? "done" : "active"} title="Uyg'ondim"
-        hint={t.woke ? "Ajoyib, birinchi qadam bosildi." : `Budilnikdan keyin ${rules.grace_minutes} daqiqa ichida bosing`}
+        hint={t.woke ? "Birinchi qadam bosildi. Endi buyruqni bajaring." : `Budilnikdan keyin ${rules.grace_minutes} daqiqa ichida — botdagi tugma yoki shu yerda`}
       />
       <Link
-        icon={Mic} state={t.voice ? "done" : t.woke ? "active" : "locked"} title="Guruhga ovozli xabar"
-        hint="Bot yuborgan gapni ovoz chiqarib o'qing va qabila guruhiga voice tashlang"
-      />
-      <Link
-        icon={Video} state={videoState} title="10 soniyalik video" tag={videoTag}
+        icon={isVideo ? Video : Mic} state={proofState} tag={proofTag}
+        title={isVideo ? "Video raport — tashqarida" : "Ovozli raport"}
         hint={
-          !t.video_required
-            ? `Hozircha faqat vaqtida turish va ovoz. Video ${rules.video_from_day}-kundan talab qilinadi.`
-            : "Tashqariga chiqing, suv iching va video krujokni botga yuboring. 3 kishidan 2 tasi tasdiqlashi kerak."
+          isVideo
+            ? "Tashqariga chiqing, suv iching. Yurib turib gapni o'qigan holda video krujok yozing va botga yuboring. Rotadan 3 kishi tekshiradi."
+            : `Gapni ovoz chiqarib o'qing va ovozli xabarni botga yuboring. Video ${rules.video_from_day}-kundan boshlanadi.`
         }
       >
-        {t.video_required && gender === "F" && (
+        {isVideo && gender === "F" && (
           <div className="quote" style={{ fontStyle: "normal" }}>
-            Yuzingizni ko'rsatish shart emas — ko'cha yoki oyna tomonga suratga oling, ovozingiz eshitilsin.
+            Yuzingizni ko'rsatish shart emas — orqa kamerani yoqing, ovozingiz eshitilsin.
           </div>
         )}
       </Link>
     </ol>
+  );
+}
+
+function OrderCard({ t }) {
+  return (
+    <div className="card order">
+      <div className="order-head">
+        <Megaphone size={16} /> BUYRUQ №{t.day_number}
+      </div>
+      <p className="muted small" style={{ margin: "8px 0 6px" }}>Ovoz chiqarib o'qing:</p>
+      <div className="order-phrase">«{t.phrase}»</div>
+      <div className="order-foot">
+        <span><Send size={14} /> Raportni <b>botga</b> yuboring</span>
+        <span className="num"><Clock size={14} /> {t.proof_deadline} gacha</span>
+      </div>
+    </div>
+  );
+}
+
+const ROLL = {
+  done: { icon: CheckCircle2, color: "var(--ok)", label: "Safda" },
+  woke: { icon: Hourglass, color: "var(--sun)", label: "Turdi, raport yo'q" },
+  absent: { icon: XCircle, color: "var(--bad)", label: "Javob yo'q" },
+  frozen: { icon: Snowflake, color: "var(--ice)", label: "Muzlatilgan" },
+  rest: { icon: BedDouble, color: "var(--rest)", label: "Yakshanba" },
+  out: { icon: Ban, color: "var(--muted)", label: "Chiqarilgan" },
+};
+
+function SquadRoll() {
+  const { data } = useLoad(api.squad);
+  if (!data) return null;
+  const pct = data.total ? (data.done / data.total) * 100 : 0;
+  return (
+    <>
+      <div className="section-title">{data.squad} · bugungi raport</div>
+      <div className="card">
+        <div className="row-between">
+          <span className="muted small"><Users size={14} style={{ verticalAlign: -2 }} /> Safda</span>
+          <b className="num">{data.done}/{data.total}</b>
+        </div>
+        <div className="progress"><i style={{ width: `${Math.max(pct, 2)}%`, background: "linear-gradient(90deg, #4fd28f, var(--ok))" }} /></div>
+        <ul className="roll">
+          {data.members.map((m, i) => {
+            const s = ROLL[m.status];
+            return (
+              <li key={i} className={m.status === "out" ? "out" : ""}>
+                <Avatar name={m.name} />
+                <span className="name">{m.name}{m.me && <span className="tag" style={{ marginLeft: 6 }}>siz</span>}</span>
+                {m.strikes > 0 && m.status !== "out" && (
+                  <span className="strikes" title={`${m.strikes} ta ogohlantirish`}>
+                    {Array.from({ length: m.strikes }, (_, k) => <i key={k} />)}
+                  </span>
+                )}
+                <s.icon size={18} color={s.color} aria-label={s.label} />
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </>
   );
 }
 
@@ -208,9 +263,10 @@ export default function Today({ me, error, reload }) {
               <div><b>Yakshanba</b><small className="muted">Uxlash mumkin. Lekin hammasini bajarsangiz — 1 ta Joker.</small></div>
             </div>
           )}
+          {t.woke && !t.proof_done && t.phrase && <OrderCard t={t} />}
           <Chain t={t} gender={me.gender} rules={me.journey.rules} />
           {!t.woke && (
-            <button className="btn btn-primary btn-xl btn-block" disabled={busy} onClick={() => run(api.wake, "Xayrli tong! Endi ovozli xabar.")}>
+            <button className="btn btn-primary btn-xl btn-block" disabled={busy} onClick={() => run(api.wake, "Xayrli tong! Buyruqni bajaring.")}>
               <Sun size={22} /> Uyg'ondim
             </button>
           )}
@@ -218,6 +274,8 @@ export default function Today({ me, error, reload }) {
       ) : (
         <Empty icon={Sunrise} title="Bugun oqim kuni emas" />
       )}
+
+      <SquadRoll key={t?.status + String(t?.woke)} />
 
       <div className="section-title">Chat oynalari</div>
       <Windows windows={me.journey.windows} />

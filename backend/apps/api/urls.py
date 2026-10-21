@@ -4,10 +4,14 @@ from . import bot, miniapp
 
 bot_patterns = [
     path("users/register/", bot.RegisterView.as_view()),
+    path("users/pending/", bot.PendingApplicationsView.as_view()),
     path("users/<int:telegram_id>/", bot.UserView.as_view()),
+    path("users/<int:telegram_id>/approve/", bot.ApproveView.as_view()),
+    path("users/<int:telegram_id>/reject/", bot.RejectView.as_view()),
     path("users/<int:telegram_id>/manifest.png", bot.ManifestView.as_view()),
     path("cohorts/recruiting/", bot.RecruitingCohortsView.as_view()),
     path("join/", bot.JoinView.as_view()),
+    path("wake/", bot.WakeView.as_view()),
     path("voice/", bot.VoiceView.as_view()),
     path("video/", bot.VideoView.as_view()),
     path("reviews/<int:review_id>/vote/", bot.VoteView.as_view()),
@@ -15,12 +19,16 @@ bot_patterns = [
     path("notifications/ack/", bot.NotificationsAckView.as_view()),
     path("alarms/", bot.AlarmsView.as_view()),
     path("windows/", bot.WindowsView.as_view()),
+    path("roll-call/", bot.RollCallView.as_view()),
+    path("squads/", bot.SquadsView.as_view()),
+    path("squads/<int:squad_id>/link/", bot.SquadLinkView.as_view()),
 ]
 
 app_patterns = [
     path("me/", miniapp.MeView.as_view()),
     path("wake/", miniapp.WakeView.as_view()),
     path("freeze/", miniapp.FreezeView.as_view()),
+    path("squad/", miniapp.SquadView.as_view()),
     path("feed/", miniapp.FeedView.as_view()),
     path("reflections/<int:pk>/fire/", miniapp.FireView.as_view()),
     path("bounties/", miniapp.BountiesView.as_view()),

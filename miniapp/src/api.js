@@ -50,6 +50,7 @@ async function request(path, { method = "GET", body } = {}) {
 export const api = {
   me: () => request("/me/"),
   wake: () => request("/wake/", { method: "POST" }),
+  squad: () => request("/squad/"),
   freeze: (reason) => request("/freeze/", { method: "POST", body: { reason } }),
   feed: () => request("/feed/"),
   reflect: (text) => request("/feed/", { method: "POST", body: { text } }),

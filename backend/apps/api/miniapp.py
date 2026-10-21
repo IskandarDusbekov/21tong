@@ -59,6 +59,20 @@ class WakeView(AppView):
         return Response(services.day_progress(record))
 
 
+class SquadView(AppView):
+    """Rota va bugungi raport — kim turdi, kim yo'q."""
+
+    def get(self, request):
+        m = self.membership()
+        if not m.squad_id:
+            return Response(None)
+        report = services.squad_report(m.squad, services.local_now().date())
+        for row in report["members"]:
+            row["me"] = row.pop("telegram_id") == request.user.telegram_id
+        report.pop("chat_id")
+        return Response(report)
+
+
 class FreezeView(AppView):
     def post(self, request):
         freeze = services.request_freeze(self.membership(), request.data.get("reason", ""))

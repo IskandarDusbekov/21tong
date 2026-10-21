@@ -11,16 +11,22 @@ import datetime as dt
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.camp import services
-from apps.camp.models import Cohort, DayRecord, Joker, Strike
+from apps.camp.models import Cohort, DayRecord, Joker, Membership, Strike
 from apps.community.models import Bounty, BountyCompletion, CoinTransaction, Reflection
+from apps.proofs.models import VideoProof
 
 COHORT_NAME = "Demo oqim"
 DAYS_PASSED = 7  # bugun 8-kun bo'ladi: budilnik allaqachon surilgan, video talab qilinadi
 
-BOYS = [(1001, "Aziz"), (1002, "Bekzod"), (1003, "Jasur"), (1004, "Sardor")]
+# 9 yigit -> 1-rota (7 kishi) + 2-rota (2 kishi)
+BOYS = [
+    (1001, "Aziz"), (1002, "Bekzod"), (1003, "Jasur"), (1004, "Sardor"), (1005, "Doniyor"),
+    (1006, "Otabek"), (1007, "Shoxrux"), (1008, "Ulug'bek"), (1009, "Temur"),
+]
 GIRLS = [(2001, "Madina"), (2002, "Nilufar"), (2003, "Zarina")]
 PENDING = [(3001, "Yangi Kelgan")]
 
@@ -43,6 +49,8 @@ class Command(BaseCommand):
             raise CommandError("seed_demo faqat DEBUG rejimida ishlaydi.")
         demo_ids = [tg for tg, _ in BOYS + GIRLS + PENDING]
         if opts["reset"]:
+            # Membership.tribe PROTECT — avval a'zoliklar, keyin oqim
+            Membership.objects.filter(cohort__name=COHORT_NAME).delete()
             Cohort.objects.filter(name=COHORT_NAME).delete()
             User.objects.filter(telegram_id__in=demo_ids).delete()
         elif Cohort.objects.filter(name=COHORT_NAME).exists():
@@ -78,6 +86,18 @@ class Command(BaseCommand):
                     record.status = DayRecord.Status.COMPLETED
                 record.save(update_fields=["status"])
             services.ensure_day_record(m, today)
+
+        # Bugungi raport turlicha bo'lsin: kimdir video yuborgan, kimdir faqat turgan, kimdir hali yo'q
+        for i, m in enumerate(members[1:6], start=1):
+            record = services.ensure_day_record(m, today)
+            record.woke_at = timezone.now()
+            record.phrase = services.rules.PHRASES[i % len(services.rules.PHRASES)]
+            record.save(update_fields=["woke_at", "phrase"])
+            if i <= 3:
+                VideoProof.objects.create(
+                    day=record, telegram_file_id=f"demo-{m.id}", duration=10,
+                    status=VideoProof.Status.APPROVED if i < 3 else VideoProof.Status.REVIEWING,
+                )
 
         Joker.objects.create(user=members[0].user, source=Joker.Source.SUNDAY)
 

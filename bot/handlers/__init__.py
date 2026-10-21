@@ -1,3 +1,4 @@
-from . import onboarding, proofs
+from . import admin, onboarding, proofs
 
-routers = [onboarding.router, proofs.router]
+# admin birinchi: /ulash va qo'mondonlik tugmalari FSM holatlaridan qat'i nazar ishlasin
+routers = [admin.router, onboarding.router, proofs.router]

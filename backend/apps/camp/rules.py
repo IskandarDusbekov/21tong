@@ -13,13 +13,33 @@ SHIFT_FROM_DAY = 7
 VIDEO_REQUIRED_FROM_DAY = 7
 # "Uyg'ondim" tugmasini budilnikdan keyin shuncha daqiqa ichida bosish kerak
 WAKE_GRACE_MINUTES = 5
+# Raport (ovoz yoki video) budilnikdan keyin shuncha daqiqa ichida yuborilishi shart
+PROOF_DEADLINE_MINUTES = 30
 # 3 Strikes = Out
 MAX_STRIKES = 3
+# Har rotada nechta odam
+SQUAD_SIZE = 7
 # P2P tekshiruv: nechta tekshiruvchi
 REVIEWERS_PER_PROOF = 3
 # Muzlatishni faqat shu vaqtdan keyin (kechqurun) ertangi kun uchun bosish mumkin
 FREEZE_ALLOWED_FROM = dt.time(18, 0)
 REFLECTION_MAX_LENGTH = 200
+
+# Uyg'ongach ovoz chiqarib o'qiladigan gaplar (kognitiv uyg'otish + raportni soxtalashtirishdan himoya)
+PHRASES = [
+    "Men bugun o'z irodamning xo'jayiniman.",
+    "Intizom — bu o'zimga bergan va'damni bajarish.",
+    "Har bir erta tong — kelajagimga qo'yilgan sarmoya.",
+    "Qiyinchilik vaqtinchalik, odat esa umrbod qoladi.",
+    "Ko'rpa meni yengolmaydi. Men turdim va harakatdaman.",
+    "Bugun kechagidan bir qadam kuchliroqman.",
+    "Bahona emas, natija. Men uyg'oqman va tayyorman.",
+    "Erta turgan yutadi. Bugun men yutaman.",
+    "O'zgarish bugun, aynan shu daqiqada boshlanadi.",
+    "Men rotamni tushirib qo'ymayman. Men shu yerdaman.",
+    "Uyqum emas, maqsadim meni boshqaradi.",
+    "Har tong — yangi imkoniyat. Uni qo'ldan bermayman.",
+]
 
 STAGES = [
     # (shu kunni tugatgach, kod, nom)
@@ -63,6 +83,10 @@ def video_required(day_number: int) -> bool:
 
 def wake_deadline(date: dt.date, alarm: dt.time, tz) -> dt.datetime:
     return dt.datetime.combine(date, alarm, tzinfo=tz) + dt.timedelta(minutes=WAKE_GRACE_MINUTES)
+
+
+def proof_deadline(date: dt.date, alarm: dt.time, tz) -> dt.datetime:
+    return dt.datetime.combine(date, alarm, tzinfo=tz) + dt.timedelta(minutes=PROOF_DEADLINE_MINUTES)
 
 
 def is_rest_day(date: dt.date) -> bool:

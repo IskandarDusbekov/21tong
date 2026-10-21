@@ -31,6 +31,9 @@ class User(AbstractUser):
     telegram_username = models.CharField(max_length=64, blank=True)
     gender = models.CharField(max_length=1, choices=Gender.choices, blank=True)
     goal = models.TextField("Maqsad", blank=True)
+    # Arizada ko'rsatilgan vaqtlar — tasdiqlanganda oqimga shu vaqtlar bilan joylashtiriladi
+    current_wake_time = models.TimeField("Hozir turadigan vaqti", null=True, blank=True)
+    target_wake_time = models.TimeField("Maqsad qilgan vaqti", null=True, blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.NEW)
 
     referral_code = models.CharField(max_length=16, unique=True, default=generate_referral_code)

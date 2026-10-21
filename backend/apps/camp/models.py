@@ -52,8 +52,6 @@ class Tribe(models.Model):
     cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name="tribes")
     gender = models.CharField(max_length=1, choices=Gender.choices)
     start_wake_time = models.TimeField()
-    telegram_chat_id = models.BigIntegerField(null=True, blank=True, unique=True)
-    invite_link = models.URLField(blank=True)
 
     class Meta:
         constraints = [
@@ -65,6 +63,29 @@ class Tribe(models.Model):
 
     def __str__(self):
         return f"{self.start_wake_time:%H:%M} Qabilasi ({self.get_gender_display()}lar)"
+
+
+class Squad(models.Model):
+    """
+    Rota — qabila ichidagi 7 kishilik jamoa. Har rotaning o'z yopiq Telegram guruhi bor:
+    raportlar, ogohlantirishlar va P2P tekshiruv birinchi navbatda rota ichida.
+    """
+
+    tribe = models.ForeignKey(Tribe, on_delete=models.CASCADE, related_name="squads")
+    number = models.PositiveSmallIntegerField()
+    telegram_chat_id = models.BigIntegerField(null=True, blank=True, unique=True)
+    invite_link = models.URLField(blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["tribe", "number"], name="unique_squad_number")]
+        ordering = ["tribe", "number"]
+
+    def __str__(self):
+        return f"{self.number}-rota · {self.tribe}"
+
+    @property
+    def name(self):
+        return f"{self.number}-rota"
 
 
 class Membership(models.Model):
@@ -79,6 +100,7 @@ class Membership(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships")
     cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name="memberships")
     tribe = models.ForeignKey(Tribe, on_delete=models.PROTECT, related_name="memberships")
+    squad = models.ForeignKey(Squad, null=True, blank=True, on_delete=models.SET_NULL, related_name="memberships")
     target_wake_time = models.TimeField("Maqsad qilingan uyg'onish vaqti")
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     joined_at = models.DateTimeField(auto_now_add=True)
@@ -112,9 +134,14 @@ class DayRecord(models.Model):
     day_number = models.PositiveSmallIntegerField()
     alarm_time = models.TimeField()
 
-    woke_at = models.DateTimeField(null=True, blank=True)  # 1-qadam: TMA "Uyg'ondim"
-    voice_at = models.DateTimeField(null=True, blank=True)  # 2-qadam: guruhga voice
-    # 3-qadam (video) — proofs.VideoProof orqali
+    woke_at = models.DateTimeField(null=True, blank=True)  # 1-qadam: "Uyg'ondim"
+    # Uyg'ongach beriladigan, ovoz chiqarib o'qiladigan gap. Har kuni har kimga tasodifiy —
+    # eski yozuvni qayta yuborib aldab bo'lmaydi, tekshiruvchilar gapni solishtiradi.
+    phrase = models.CharField(max_length=200, blank=True)
+    # 2-qadam, 1–6 kunlar: gap o'qilgan ovozli raport (botga)
+    voice_at = models.DateTimeField(null=True, blank=True)
+    voice_file_id = models.CharField(max_length=255, blank=True)
+    # 2-qadam, 7-kundan: tashqarida yozilgan video krujok — proofs.VideoProof orqali
 
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     evaluated_at = models.DateTimeField(null=True, blank=True)
@@ -171,6 +198,7 @@ class Notification(models.Model):
     """
 
     class Kind(models.TextChoices):
+        NEW_APPLICATION = "new_application", "Yangi ariza (adminlarga)"
         APPROVED = "approved", "Tasdiqlandi"
         REJECTED = "rejected", "Rad etildi"
         REVIEW_REQUEST = "review_request", "Videoni tekshirish so'rovi"

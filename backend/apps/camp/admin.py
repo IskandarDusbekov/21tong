@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Cohort, DayRecord, Freeze, Joker, Membership, Strike, Tribe
+from .models import Cohort, DayRecord, Freeze, Joker, Membership, Squad, Strike, Tribe
 
 
 class TribeInline(admin.TabularInline):
@@ -15,16 +15,28 @@ class CohortAdmin(admin.ModelAdmin):
     inlines = [TribeInline]
 
 
+class SquadInline(admin.TabularInline):
+    model = Squad
+    extra = 0
+
+
 @admin.register(Tribe)
 class TribeAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "cohort", "gender", "telegram_chat_id")
+    list_display = ("__str__", "cohort", "gender")
     list_filter = ("cohort", "gender")
+    inlines = [SquadInline]
+
+
+@admin.register(Squad)
+class SquadAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "telegram_chat_id", "invite_link")
+    list_filter = ("tribe__cohort", "tribe__gender")
 
 
 @admin.register(Membership)
 class MembershipAdmin(admin.ModelAdmin):
-    list_display = ("user", "cohort", "tribe", "target_wake_time", "status", "active_strikes")
-    list_filter = ("cohort", "status", "tribe__gender")
+    list_display = ("user", "cohort", "tribe", "squad", "target_wake_time", "status", "active_strikes")
+    list_filter = ("cohort", "status", "tribe__gender", "squad")
     search_fields = ("user__telegram_username", "user__telegram_id")
 
 

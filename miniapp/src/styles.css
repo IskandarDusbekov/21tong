@@ -173,6 +173,25 @@ button:disabled { cursor: default; }
   font-size: 14px; font-style: italic; border-left: 3px solid var(--sun);
 }
 
+/* ---------- Buyruq kartasi ---------- */
+.order { border: 1.5px solid color-mix(in srgb, var(--sun) 45%, transparent); background: linear-gradient(180deg, var(--sun-soft), transparent 70%), var(--surface); }
+.order-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.1em; color: var(--sun); }
+.order-phrase { font-size: 19px; font-weight: 700; line-height: 1.35; letter-spacing: -0.01em; }
+.order-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.order-foot span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---------- Rota raporti ---------- */
+.row-between { display: flex; justify-content: space-between; align-items: center; }
+.roll { list-style: none; margin: 12px 0 0; padding: 0; }
+.roll li { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.roll li + li { border-top: 1px solid var(--line); }
+.roll .avatar { width: 30px; height: 30px; font-size: 13px; }
+.roll .name { flex: 1; min-width: 0; font-weight: 500; }
+.roll li.out { opacity: .45; }
+.roll li.out .name { text-decoration: line-through; }
+.strikes { display: inline-flex; gap: 3px; }
+.strikes i { width: 7px; height: 7px; border-radius: 2px; background: var(--bad); }
+
 .banner { display: flex; gap: 12px; align-items: center; padding: 16px; border-radius: var(--radius); }
 .banner-icon { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; flex: none; }
 .banner.ok { background: var(--ok-soft); } .banner.ok .banner-icon { background: var(--ok); color: #fff; }

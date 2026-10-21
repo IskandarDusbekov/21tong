@@ -67,7 +67,7 @@ export default function Feed({ me }) {
       <div className="screen-head">
         <div>
           <h2>Bugungi kun qanday o'tdi?</h2>
-          <p className="muted small">Faqat o'z qabilangiz ko'radi · maks {MAX} belgi</p>
+          <p className="muted small">Faqat rotangiz ko'radi · maks {MAX} belgi</p>
         </div>
         <div className="window-icon" style={{ background: "var(--rest-soft)", color: "var(--rest)" }}><Moon size={18} /></div>
       </div>

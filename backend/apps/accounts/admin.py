@@ -14,7 +14,7 @@ class UserAdmin(BaseUserAdmin):
     actions = ["approve", "reject"]
     fieldsets = BaseUserAdmin.fieldsets + (
         ("21tong", {"fields": (
-            "telegram_id", "telegram_username", "gender", "goal", "status",
+            "telegram_id", "telegram_username", "gender", "goal", "current_wake_time", "target_wake_time", "status",
             "referral_code", "referred_by", "referral_joker_granted", "approved_at",
         )}),
     )
