@@ -74,6 +74,8 @@ if os.getenv("POSTGRES_DB"):
             "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
             "HOST": os.getenv("POSTGRES_HOST", "localhost"),
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            # Server o'chiq bo'lsa runserver jim osilib qolmasin — aniq xato chiqsin
+            "OPTIONS": {"connect_timeout": 5},
         }
     }
 else:
