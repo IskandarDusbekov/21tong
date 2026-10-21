@@ -180,6 +180,74 @@ def day_progress(record: DayRecord):
     }
 
 
+def survived_days(membership):
+    return membership.days.exclude(status__in=[DayRecord.Status.PENDING, DayRecord.Status.FAILED]).count()
+
+
+def journey(membership, now=None):
+    """Mini App'dagi "Yo'l" ekrani uchun: bosqichlar, 21 kunlik kalendar, oynalar."""
+    now = local_now(now)
+    cohort = membership.cohort
+    survived = survived_days(membership)
+    records = {r.day_number: r for r in membership.days.all()}
+    start, target = membership.tribe.start_wake_time, membership.target_wake_time
+
+    days = []
+    for n in range(1, cohort.duration_days + 1):
+        date = cohort.start_date + dt.timedelta(days=n - 1)
+        record = records.get(n)
+        if record:
+            status = record.status
+        else:
+            status = "future" if date > now.date() else DayRecord.Status.PENDING
+        days.append({
+            "day_number": n,
+            "date": date.isoformat(),
+            "weekday": date.weekday(),
+            "status": status,
+            "today": date == now.date(),
+            "alarm_time": (record.alarm_time if record else rules.alarm_time_for_day(start, target, n)).strftime("%H:%M"),
+            "video_required": rules.video_required(n),
+        })
+
+    stages = [
+        {"code": code, "name": name, "day": day, "reached": survived >= day}
+        for day, code, name in rules.STAGES
+    ]
+    next_stage = next((s for s in stages if not s["reached"]), None)
+
+    def window(start_t, end_t):
+        return {
+            "start": start_t.strftime("%H:%M"),
+            "end": end_t.strftime("%H:%M"),
+            "open": rules.in_window(now, start_t, end_t),
+        }
+
+    tomorrow_number = cohort.day_number(now.date() + dt.timedelta(days=1))
+    return {
+        "survived": survived,
+        "current_day": cohort.day_number(now.date()),
+        "duration": cohort.duration_days,
+        "stage": rules.stage_for(survived),
+        "next_stage": next_stage,
+        "stages": stages,
+        "days": days,
+        "windows": {
+            "morning": window(cohort.morning_window_start, cohort.morning_window_end),
+            "evening": window(cohort.evening_window_start, cohort.evening_window_end),
+        },
+        "tomorrow_alarm": (
+            rules.alarm_time_for_day(start, target, tomorrow_number).strftime("%H:%M") if tomorrow_number else None
+        ),
+        "rules": {
+            "shift_from_day": rules.SHIFT_FROM_DAY,
+            "video_from_day": rules.VIDEO_REQUIRED_FROM_DAY,
+            "shift_minutes": rules.SHIFT_STEP_MINUTES,
+            "grace_minutes": rules.WAKE_GRACE_MINUTES,
+        },
+    }
+
+
 # --- Strike / Joker -----------------------------------------------------------
 
 @dataclass

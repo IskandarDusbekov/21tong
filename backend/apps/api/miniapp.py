@@ -32,22 +32,23 @@ class MeView(AppView):
         user = request.user
         m = services.active_membership(user)
         today = None
-        stage = None
+        journey = None
         if m is not None:
             now = services.local_now()
             if m.cohort.day_number(now.date()):
                 today = services.day_progress(services.ensure_day_record(m, now.date()))
-            survived = m.days.exclude(status__in=["pending", "failed"]).count()
-            stage = rules.stage_for(survived)
+            journey = services.journey(m, now)
         return Response({
             "first_name": user.first_name,
             "gender": user.gender,
             "status": user.status,
+            "goal": user.goal,
             "jokers": services.jokers_available(user),
             "coins": community.coin_balance(user),
             "membership": membership_summary(m),
             "today": today,
-            "stage": stage,
+            "journey": journey,
+            "stage": journey["stage"] if journey else None,
             "max_strikes": rules.MAX_STRIKES,
         })
 

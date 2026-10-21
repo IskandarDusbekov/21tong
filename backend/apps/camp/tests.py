@@ -232,6 +232,24 @@ class ApiTests(CampTestCase):
         png = client.get("/api/bot/users/7/manifest.png", HTTP_X_BOT_SECRET="s3cret")
         self.assertEqual(png["Content-Type"], "image/png")
 
+    def test_journey_calendar_and_stages(self):
+        m = self.make_member(1)
+        for i in range(3):
+            day = MONDAY + dt.timedelta(days=i)
+            self.complete_morning(m, day, video=False)
+            services.evaluate_day(services.ensure_day_record(m, day))
+        j = services.journey(m, at(MONDAY + dt.timedelta(days=3), 21))
+        self.assertEqual(j["survived"], 3)
+        self.assertEqual(j["stage"]["code"], "survivor")
+        self.assertEqual(j["next_stage"]["code"], "adapted")
+        self.assertEqual(len(j["days"]), 21)
+        self.assertEqual(j["days"][0]["status"], "completed")
+        self.assertTrue(j["days"][3]["today"])
+        self.assertEqual(j["days"][20]["status"], "future")
+        self.assertEqual(j["days"][7]["alarm_time"], "06:50")
+        self.assertTrue(j["windows"]["evening"]["open"])
+        self.assertFalse(j["windows"]["morning"]["open"])
+
     def test_dev_login_only_when_enabled(self):
         self.make_member(42)
         client = APIClient()

@@ -1,54 +1,54 @@
-import { useCallback, useEffect, useState } from "react";
-import { api, devUser, inTelegram, tg } from "./api.js";
+import { useState } from "react";
+import { Flame, LogOut, Route, Sun, Target, Trophy, Wrench } from "lucide-react";
+import { api, devUser, inTelegram } from "./api.js";
+import { ToastProvider, useLoad } from "./ui.jsx";
+import Bounties from "./screens/Bounties.jsx";
+import DevLogin from "./screens/DevLogin.jsx";
+import Feed from "./screens/Feed.jsx";
+import Journey from "./screens/Journey.jsx";
+import Rating from "./screens/Rating.jsx";
+import Today from "./screens/Today.jsx";
 
 const TABS = [
-  { id: "today", label: "Bugun", icon: "☀️" },
-  { id: "feed", label: "Lenta", icon: "🔥" },
-  { id: "bounty", label: "Bounty", icon: "🎯" },
-  { id: "rating", label: "Reyting", icon: "🏆" },
+  { id: "today", label: "Bugun", icon: Sun },
+  { id: "journey", label: "Yo'l", icon: Route },
+  { id: "feed", label: "Lenta", icon: Flame },
+  { id: "bounty", label: "Bounty", icon: Target },
+  { id: "rating", label: "Reyting", icon: Trophy },
 ];
 
-function haptic(type = "success") {
-  tg?.HapticFeedback?.notificationOccurred(type);
-}
-
-function useLoad(fn) {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState("");
-  const reload = useCallback(() => {
-    fn().then(setData).catch((e) => setError(e.message));
-  }, [fn]);
-  useEffect(reload, [reload]);
-  return { data, error, reload, setError };
-}
-
-export default function App() {
+function Main({ dev, onLogout }) {
   const [tab, setTab] = useState("today");
-  const [dev, setDev] = useState(() => (inTelegram ? null : devUser.get()));
+  const { data: me, error, reload } = useLoad(api.me);
 
-  if (!inTelegram && !dev) {
-    return <DevLogin onPick={(u) => { devUser.set(u); setDev(u); }} />;
-  }
+  const go = (id) => {
+    setTab(id);
+    window.scrollTo({ top: 0 });
+    if (id === "today" || id === "journey") reload();
+  };
 
   return (
     <div className="app">
       {dev && (
         <div className="devbar">
-          <span>🛠 Dev: <b>{dev.name}</b> ({dev.gender === "F" ? "qiz" : "yigit"})</span>
-          <button onClick={() => { devUser.clear(); setDev(null); }}>Almashtirish</button>
+          <span><Wrench size={14} />Dev: <b>{dev.name}</b> · {dev.gender === "F" ? "qiz" : "yigit"}</span>
+          <button className="btn btn-soft" style={{ padding: "5px 10px", fontSize: 13 }} onClick={onLogout}>
+            <LogOut size={14} /> Almashtirish
+          </button>
         </div>
       )}
-      <main key={dev?.telegram_id}>
-        {tab === "today" && <Today />}
-        {tab === "feed" && <Feed />}
-        {tab === "bounty" && <Bounties />}
+      <main>
+        {tab === "today" && <Today me={me} error={error} reload={reload} />}
+        {tab === "journey" && <Journey me={me} error={error} />}
+        {tab === "feed" && <Feed me={me} />}
+        {tab === "bounty" && <Bounties me={me} reloadMe={reload} />}
         {tab === "rating" && <Rating />}
       </main>
-      <nav className="tabs">
-        {TABS.map((t) => (
-          <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => setTab(t.id)}>
-            <span>{t.icon}</span>
-            {t.label}
+      <nav className="tabbar">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button key={id} className={tab === id ? "active" : ""} onClick={() => go(id)} aria-current={tab === id ? "page" : undefined}>
+            <Icon size={21} strokeWidth={tab === id ? 2.4 : 2} />
+            {label}
           </button>
         ))}
       </nav>
@@ -56,221 +56,16 @@ export default function App() {
   );
 }
 
-function DevLogin({ onPick }) {
-  const { data, error } = useLoad(api.devUsers);
-  const statusLabel = { pending: "tasdiq kutmoqda", approved: "", rejected: "rad etilgan", new: "yangi" };
-  return (
-    <div className="app">
-      <h2>🛠 Dev kirish</h2>
-      <p className="muted">
-        Telegram'siz lokal ko'rish uchun. Kim sifatida kirasiz? Ro'yxat bo'sh bo'lsa:{" "}
-        <code>python manage.py seed_demo</code>
-      </p>
-      {error && <p className="error">{error}</p>}
-      {data?.map((u) => (
-        <button key={u.telegram_id} className="card devuser" onClick={() => onPick(u)}>
-          <span>{u.gender === "F" ? "👩" : "👨"} {u.name}</span>
-          <small>{statusLabel[u.status] || ""} · {u.telegram_id}</small>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function Step({ done, label, hint }) {
-  return (
-    <li className={done ? "step done" : "step"}>
-      <span className="check">{done ? "✓" : ""}</span>
-      <div>
-        <div>{label}</div>
-        {hint && <small>{hint}</small>}
-      </div>
-    </li>
-  );
-}
-
-function Today() {
-  const { data: me, error, reload, setError } = useLoad(api.me);
-  const [busy, setBusy] = useState(false);
-
-  const act = async (fn, okMsg) => {
-    setBusy(true);
-    try {
-      await fn();
-      haptic();
-      if (okMsg) tg?.showAlert?.(okMsg);
-      reload();
-    } catch (e) {
-      haptic("error");
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (error && !me) return <p className="error">{error}</p>;
-  if (!me) return <p className="muted">Yuklanmoqda…</p>;
-
-  const m = me.membership;
-  const t = me.today;
-  const videoLabel = { reviewing: "tekshirilmoqda", approved: "tasdiqlandi", rejected: "rad etildi" };
+export default function App() {
+  const [dev, setDev] = useState(() => (inTelegram ? null : devUser.get()));
 
   return (
-    <section>
-      <header className="hero">
-        <div className="muted">{m ? m.tribe : "Faol oqim yo'q"}</div>
-        <h1>{t ? `${t.day_number}-kun` : "21 Tong"}</h1>
-        {t && <div className="alarm">⏰ {t.alarm_time}</div>}
-        {me.stage && <div className="badge">🏅 {me.stage.name}</div>}
-      </header>
-
-      <div className="stats">
-        <div><b>{m ? `${m.strikes}/${me.max_strikes}` : "–"}</b><small>Strike</small></div>
-        <div><b>{me.jokers}</b><small>Joker 🃏</small></div>
-        <div><b>{me.coins}</b><small>IrodaCoin</small></div>
-      </div>
-
-      {error && <p className="error">{error}</p>}
-
-      {t && t.status === "pending" && (
-        <>
-          <ul className="steps">
-            <Step done={t.woke} label="«Uyg'ondim» tugmasi" />
-            <Step done={t.voice} label="Guruhga ovozli xabar" hint="Botdagi gapni ovoz chiqarib o'qing" />
-            {t.video_required && (
-              <Step
-                done={t.video === "approved"}
-                label="10 soniyalik video krujok"
-                hint={t.video ? `Video ${videoLabel[t.video]}` : "Tashqariga chiqing, suv iching, botga yuboring"}
-              />
-            )}
-          </ul>
-          {!t.woke && (
-            <button className="primary big" disabled={busy} onClick={() => act(api.wake)}>
-              ☀️ Uyg'ondim
-            </button>
-          )}
-        </>
+    <ToastProvider>
+      {!inTelegram && !dev ? (
+        <DevLogin onPick={(u) => { devUser.set(u); setDev(u); }} />
+      ) : (
+        <Main key={dev?.telegram_id} dev={dev} onLogout={() => { devUser.clear(); setDev(null); }} />
       )}
-      {t && t.status === "frozen" && <p className="card">❄️ Bugun muzlatilgan kun. Tezroq tuzaling!</p>}
-      {t && t.status === "completed" && <p className="card">✅ Bugungi kun bajarildi. Zo'r!</p>}
-
-      {m && !m.freeze_used && (
-        <button
-          className="ghost"
-          disabled={busy}
-          onClick={() =>
-            tg?.showConfirm
-              ? tg.showConfirm("Ertangi kunni muzlatasizmi? Bu butun oqimda faqat 1 marta.", (ok) =>
-                  ok && act(() => api.freeze(""), "Ertangi kun muzlatildi."))
-              : act(() => api.freeze(""), "Ertangi kun muzlatildi.")
-          }
-        >
-          ❄️ Ertangi kunni muzlatish (kasallik)
-        </button>
-      )}
-    </section>
-  );
-}
-
-function Feed() {
-  const { data, error, reload, setError } = useLoad(api.feed);
-  const [text, setText] = useState("");
-  const mine = data?.some((r) => r.mine);
-
-  const send = async () => {
-    try {
-      await api.reflect(text);
-      setText("");
-      haptic();
-      reload();
-    } catch (e) {
-      setError(e.message);
-    }
-  };
-  const fire = async (id) => {
-    try {
-      await api.fire(id);
-      haptic();
-      reload();
-    } catch (e) {
-      setError(e.message);
-    }
-  };
-
-  return (
-    <section>
-      <h2>Bugungi kun qanday o'tdi?</h2>
-      {error && <p className="error">{error}</p>}
-      {!mine && (
-        <div className="card">
-          <textarea maxLength={200} value={text} onChange={(e) => setText(e.target.value)} placeholder="Qisqa refleksiya…" />
-          <div className="row">
-            <small className="muted">{text.length}/200</small>
-            <button className="primary" disabled={!text.trim()} onClick={send}>Yuborish</button>
-          </div>
-        </div>
-      )}
-      {data?.length === 0 && <p className="muted">Hali hech kim yozmadi. Birinchi bo'ling!</p>}
-      {data?.map((r) => (
-        <div key={r.id} className="card post">
-          <b>{r.author}</b>
-          <p>{r.text}</p>
-          <button className={r.fired_by_me ? "fire on" : "fire"} disabled={r.mine || r.fired_by_me} onClick={() => fire(r.id)}>
-            🔥 {r.fires}
-          </button>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function Bounties() {
-  const { data, error, reload, setError } = useLoad(api.bounties);
-  const complete = async (id) => {
-    try {
-      await api.completeBounty(id);
-      haptic();
-      reload();
-    } catch (e) {
-      setError(e.message);
-    }
-  };
-  return (
-    <section>
-      <h2>Kunduzgi topshiriqlar</h2>
-      {error && <p className="error">{error}</p>}
-      {data?.length === 0 && <p className="muted">Bugun topshiriq yo'q.</p>}
-      {data?.map((b) => (
-        <div key={b.id} className="card">
-          <div className="row">
-            <b>{b.title}</b>
-            <span className="badge">+{b.reward}</span>
-          </div>
-          {b.description && <p className="muted">{b.description}</p>}
-          <button className="primary" disabled={b.done} onClick={() => complete(b.id)}>
-            {b.done ? "Bajarildi ✓" : "Bajardim"}
-          </button>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function Rating() {
-  const { data, error } = useLoad(api.leaderboard);
-  return (
-    <section>
-      <h2>IrodaCoin reytingi</h2>
-      {error && <p className="error">{error}</p>}
-      <ol className="rating">
-        {data?.map((r, i) => (
-          <li key={i} className={r.me ? "me" : ""}>
-            <span>{i + 1}. {r.name}</span>
-            <b>{r.coins}</b>
-          </li>
-        ))}
-      </ol>
-    </section>
+    </ToastProvider>
   );
 }
