@@ -2,7 +2,7 @@
 // Telegram guruh o'rniga. Chatga yozish faqat oyna ochiq bo'lganda — qolgan vaqt faqat kuzatish.
 import { useEffect, useRef, useState } from "react";
 import {
-  AlarmClock, CheckCircle2, Clock, Eye, Flame, Hourglass, Lock, Mic, Moon, Pause, Play, Send,
+  CheckCircle2, Eye, Flame, Hourglass, Lock, Mic, Moon, Play, Send,
   ShieldCheck, Sparkles, Sunrise, Users, Video, XCircle,
 } from "lucide-react";
 import { api, proofMedia } from "../api.js";
@@ -244,7 +244,10 @@ export default function Chat({ me }) {
 
       <div className="chat-list" ref={listRef}>
         {data.items.length === 0 ? (
-          <Empty icon={Sparkles} title="Hali tinch" text="Birinchi raport va xabarlar shu yerda paydo bo'ladi." />
+          <Empty
+            icon={Sparkles} title="Hali tinch"
+            text={data.prestart ? "Rotadoshlaringiz bilan tanishing — birinchi xabarni yozing." : "Birinchi raport va xabarlar shu yerda paydo bo'ladi."}
+          />
         ) : (
           data.items.map((it, i) => <ChatItem key={`${it.type}-${it.at}-${i}`} it={it} onFire={(id) => run(() => api.fire(id))} />)
         )}
@@ -252,17 +255,6 @@ export default function Chat({ me }) {
 
       {data.can_reflect && <ReflectionPrompt max={me.reflection_max_length || 200} onSent={reload} />}
       <Composer open={data.window.open} nextOpen={data.window.next_open} onSent={reload} />
-
-      <div className="chat-hint small muted">
-        {data.prestart ? (
-          <><Users size={12} /> Rotadoshlaringiz bilan tanishing. Start boshlangach bu yerda tonggi raportlar paydo bo'ladi.</>
-        ) : (
-          <>
-            <AlarmClock size={12} /> Raportni botga yuboring — u shu chatda hammaga ko'rinadi.
-            <Clock size={12} style={{ marginLeft: 8 }} /> Kech kelgan raport ham tushadi, lekin hisoblanmaydi.
-          </>
-        )}
-      </div>
     </div>
   );
 }

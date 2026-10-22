@@ -376,8 +376,10 @@ button:disabled { cursor: default; }
 
 .tag.info { background: var(--ice-soft); color: var(--ice); }
 
-/* --- Rota chati ------------------------------------------------------------ */
-.chat { display: flex; flex-direction: column; }
+/* --- Rota chati (Telegram'dek to'liq oyna) --------------------------------- */
+/* Chat butun ekranni egallaydi: tepada sarlavha, o'rtada xabarlar (scroll),
+   pastda doimiy yozish joyi (floating tabbar ustida). */
+.chat { display: flex; flex-direction: column; height: calc(100dvh - 108px); }
 .chat-window {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 10px 14px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow);
@@ -392,8 +394,9 @@ button:disabled { cursor: default; }
 .chat-roll { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 13px; color: var(--muted); flex: none; }
 
 .chat-list {
+  flex: 1; min-height: 0;
   display: flex; flex-direction: column; gap: 10px;
-  max-height: 58vh; overflow-y: auto; padding: 4px 2px; scroll-behavior: smooth;
+  overflow-y: auto; padding: 4px 2px; scroll-behavior: smooth;
 }
 .chat-list > * { animation: chatIn .28s ease both; }
 @keyframes chatIn { from { opacity: 0; transform: translateY(8px); } }
@@ -518,6 +521,7 @@ button:disabled { cursor: default; }
   box-shadow: var(--shadow);
 }
 .sound-toggle:hover { color: var(--text); }
+.theme-toggle { right: 52px; }
 
 /* --- "Uyg'ondim" marosimi -------------------------------------------------- */
 .wake-btn { animation: wakePulse 2s ease-in-out infinite; }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { LogOut, MessagesSquare, Route, Sun, Sunrise, Target, Trophy, Wrench } from "lucide-react";
 import { api, devUser, inTelegram } from "./api.js";
-import { SoundToggle, ToastProvider, useLoad } from "./ui.jsx";
+import { SoundToggle, ThemeToggle, ToastProvider, useLoad } from "./ui.jsx";
 import Bounties from "./screens/Bounties.jsx";
 import Chat from "./screens/Chat.jsx";
 import DevLogin from "./screens/DevLogin.jsx";
@@ -33,6 +33,7 @@ function Main({ dev, onLogout }) {
 
   return (
     <div className="app">
+      <ThemeToggle />
       <SoundToggle />
       {dev && (
         <div className="devbar">

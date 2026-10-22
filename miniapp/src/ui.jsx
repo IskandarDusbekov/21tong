@@ -1,6 +1,6 @@
 // Umumiy UI bo'laklari: ma'lumot yuklash, toast, tasdiqlash oynasi, avatar, bo'sh holat.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Volume2, VolumeX } from "lucide-react";
+import { AlertCircle, CheckCircle2, Moon, Sun, Volume2, VolumeX } from "lucide-react";
 import { tg } from "./api.js";
 import { sound } from "./sound.js";
 
@@ -17,6 +17,27 @@ export function SoundToggle() {
       onClick={() => setMuted(sound.toggle())}
     >
       {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+    </button>
+  );
+}
+
+/** Light/night rejimini almashtirish — doimiy, yuqori o'ng burchakda (ovoz tugmasi yonida). */
+export function ThemeToggle() {
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem("21tong.theme") || ""; } catch { return ""; }
+  });
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme) root.dataset.theme = theme; else delete root.dataset.theme;
+    try { localStorage.setItem("21tong.theme", theme); } catch { /* private rejim */ }
+  }, [theme]);
+  const dark = theme ? theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return (
+    <button
+      className="sound-toggle theme-toggle" aria-label={dark ? "Yorug' rejim" : "Tungi rejim"}
+      onClick={() => setTheme(dark ? "light" : "dark")}
+    >
+      {dark ? <Sun size={16} /> : <Moon size={16} />}
     </button>
   );
 }
