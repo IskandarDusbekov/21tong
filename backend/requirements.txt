@@ -3,5 +3,7 @@ djangorestframework>=3.18,<4
 psycopg[binary]>=3.3,<4
 python-dotenv>=1.2,<2
 pillow>=13,<14
+pillow-heif>=0.18,<1
+httpx>=0.27
 gunicorn>=23
 qrcode>=8,<9

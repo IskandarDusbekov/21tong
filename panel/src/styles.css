@@ -112,6 +112,10 @@ code { font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
 .card-pad { padding: 18px 20px; }
 .panel-video { width: 100%; max-width: 420px; margin-top: 12px; border-radius: 12px; background: #000; max-height: 480px; }
+.chat-mod { display: flex; flex-direction: column; gap: 4px; max-height: 420px; overflow-y: auto; }
+.chat-mod-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 10px; }
+.chat-mod-row:hover { background: var(--surface-2); }
+.chat-mod-row .avatar { width: 32px; height: 32px; font-size: 13px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .card-head p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
 .grid { display: grid; gap: 16px; }

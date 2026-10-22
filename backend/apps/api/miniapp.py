@@ -175,18 +175,9 @@ class WaterUploadView(AppView):
     """2-topshiriq: iliq suv ichilgani rasmi (multipart: photo)."""
 
     def post(self, request):
-        upload = request.FILES.get("photo")
-        if not upload:
-            raise exceptions.ValidationError("Rasm topilmadi.")
-        if upload.size > 10 * 1024 * 1024:
-            raise exceptions.ValidationError("Rasm juda katta (maksimal 10 MB).")
-        try:  # haqiqiy rasm ekanini tekshiramiz
-            from PIL import Image
-            Image.open(upload).verify()
-            upload.seek(0)
-        except Exception:
-            raise exceptions.ValidationError("Bu rasm fayli emas.")
-        record = services.record_water(self.membership(), upload)
+        # HEIC/iPhone ham qabul qilinadi — JPEG ga keltiriladi
+        image = community.normalize_image(request.FILES.get("photo"))
+        record = services.record_water(self.membership(), image)
         return Response(services.day_progress(record), status=201)
 
 
@@ -301,7 +292,8 @@ class PhotosView(AppView):
         return Response(community.photo_feed(self.membership()))
 
     def post(self, request):
-        entry = community.upload_photo(self.membership(), request.FILES.get("image"))
+        image = community.normalize_image(request.FILES.get("image"))
+        entry = community.upload_photo(self.membership(), image)
         return Response({"id": entry.id}, status=201)
 
 

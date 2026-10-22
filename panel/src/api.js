@@ -91,4 +91,12 @@ export const api = {
   broadcasts: () => request("/broadcasts/"),
   previewBroadcast: (body) => request("/broadcasts/", { method: "POST", body, query: { preview: 1 } }),
   sendBroadcast: (body) => request("/broadcasts/", { method: "POST", body }),
+
+  bounties: () => request("/bounties/"),
+  createBounty: (body) => request("/bounties/", { method: "POST", body }),
+  deleteBounty: (id) => request(`/bounties/${id}/`, { method: "DELETE" }),
+
+  chats: () => request("/chats/"),
+  squadChat: (id) => request(`/chats/${id}/`),
+  deleteChatMessage: (id) => request(`/chat-messages/${id}/`, { method: "DELETE" }),
 };

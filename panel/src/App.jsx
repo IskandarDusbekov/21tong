@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  CalendarRange, FileText, Home, Inbox, LogOut, Megaphone, Menu, MessageSquareText, Moon,
-  Settings2, Sun, Sunrise, Users, UsersRound, Video,
+  CalendarRange, FileText, Home, Inbox, LogOut, Megaphone, Menu, MessagesSquare, MessageSquareText, Moon,
+  Settings2, Sun, Sunrise, Target, Users, UsersRound, Video,
 } from "lucide-react";
 import { api } from "./api.js";
 import { go, parseHash } from "./router.js";
@@ -12,7 +12,9 @@ import Applications from "./pages/Applications.jsx";
 import Members from "./pages/Members.jsx";
 import Squads from "./pages/Squads.jsx";
 import Videos from "./pages/Videos.jsx";
+import Chats from "./pages/Chats.jsx";
 import Cohorts from "./pages/Cohorts.jsx";
+import Bounties from "./pages/Bounties.jsx";
 import Broadcast from "./pages/Broadcast.jsx";
 import SettingsPage from "./pages/Settings.jsx";
 import Messages from "./pages/Messages.jsx";
@@ -25,9 +27,11 @@ const NAV = [
     { id: "members", title: "Ishtirokchilar", icon: Users, page: Members },
     { id: "squads", title: "Rotalar", icon: UsersRound, page: Squads },
     { id: "videos", title: "Video raportlar", icon: Video, page: Videos, badge: "videos_reviewing" },
+    { id: "chats", title: "Rota chatlari", icon: MessagesSquare, page: Chats },
   ] },
   { label: "Lager", items: [
     { id: "cohorts", title: "Oqimlar", icon: CalendarRange, page: Cohorts },
+    { id: "bounties", title: "Topshiriqlar (Bounty)", icon: Target, page: Bounties },
     { id: "broadcast", title: "Ommaviy xabar", icon: Megaphone, page: Broadcast },
   ] },
   { label: "Sozlash", items: [

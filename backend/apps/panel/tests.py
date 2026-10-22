@@ -136,8 +136,37 @@ class PanelDataTests(PanelTestCase):
     def test_every_endpoint_answers(self):
         self.make_member(1)
         for url in ["dashboard", "applications", "members", "squads", "settings", "messages", "phrases",
-                    "stages", "stages/icons", "cohorts", "broadcasts", "videos"]:
+                    "stages", "stages/icons", "cohorts", "broadcasts", "videos", "bounties", "chats"]:
             self.assertEqual(self.client.get(f"/api/panel/{url}/").status_code, 200, url)
+
+    def test_bounty_create_and_delete(self):
+        from apps.community.models import Bounty
+        self.make_member(1)
+        body = {"cohort": self.cohort.id, "date": services.local_now().date().isoformat(),
+                "title": "20 bet kitob", "description": "Ixtiyoriy", "reward": 15}
+        bid = self.client.post("/api/panel/bounties/", body, format="json").json()["id"]
+        items = self.client.get("/api/panel/bounties/").json()["items"]
+        self.assertTrue(any(b["id"] == bid and b["title"] == "20 bet kitob" for b in items))
+        self.assertEqual(self.client.delete(f"/api/panel/bounties/{bid}/").status_code, 204)
+        self.assertFalse(Bounty.objects.filter(pk=bid).exists())
+
+    def test_chat_monitoring_and_message_delete(self):
+        from apps.community import services as community
+        from apps.community.models import SquadMessage
+        m = self.make_member(1)
+        # Chat oynasini ochib, xabar yozamiz
+        cohort = m.cohort
+        now = services.local_now().replace(hour=cohort.morning_window_start.hour,
+                                            minute=cohort.morning_window_start.minute, second=0, microsecond=0)
+        community.post_chat_message(m, "Salom rota", now)
+        chats = self.client.get("/api/panel/chats/").json()
+        row = next(c for c in chats if c["id"] == m.squad_id)
+        self.assertEqual(row["count"], 1)
+        thread = self.client.get(f"/api/panel/chats/{m.squad_id}/").json()
+        self.assertEqual(thread["messages"][0]["text"], "Salom rota")
+        msg_id = thread["messages"][0]["id"]
+        self.assertEqual(self.client.delete(f"/api/panel/chat-messages/{msg_id}/").status_code, 204)
+        self.assertFalse(SquadMessage.objects.filter(pk=msg_id).exists())
 
 
 

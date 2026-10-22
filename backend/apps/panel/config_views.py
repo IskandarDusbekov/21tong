@@ -1,5 +1,6 @@
-"""Sozlamalar, bot matnlari, gaplar, bosqichlar, oqimlar, ommaviy xabar, video raportlar."""
+"""Sozlamalar, bot matnlari, gaplar, bosqichlar, oqimlar, ommaviy xabar, video raportlar, chat, bounty."""
 import copy
+import datetime as dt
 
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
@@ -19,6 +20,7 @@ from apps.camp.models import Award, Cohort, Membership, Notification, Squad, Wak
 from apps.control import defaults
 from apps.control.models import SETTINGS_GROUPS, BotMessage, Broadcast, CampSettings, Phrase, Stage
 from apps.control.services import broadcast_recipients, send_broadcast
+from apps.community.models import Bounty, SquadMessage
 from apps.proofs.models import VideoProof
 
 from .base import PanelView, person
@@ -389,6 +391,101 @@ class VideosView(PanelView):
             }
             for v in qs[:200]
         ])
+
+
+# --- Kunduzgi topshiriqlar (Bounty) ---------------------------------------------------
+
+class BountySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Bounty
+        fields = ["id", "cohort", "date", "title", "description", "reward"]
+
+
+class BountiesView(PanelView):
+    def get(self, request):
+        today = services.local_now().date()
+        running = list(Cohort.objects.filter(status=Cohort.Status.RUNNING).order_by("start_date"))
+        bounties = (
+            Bounty.objects.filter(cohort__in=running, date__gte=today - dt.timedelta(days=2))
+            .select_related("cohort").annotate(done=models.Count("completions")).order_by("-date", "-id")
+        )
+        return Response({
+            "today": today.isoformat(),
+            "cohorts": [{"id": c.id, "name": c.name} for c in running],
+            "items": [{
+                "id": b.id, "cohort": b.cohort_id, "cohort_name": b.cohort.name, "date": b.date.isoformat(),
+                "title": b.title, "description": b.description, "reward": b.reward, "done": b.done,
+            } for b in bounties],
+        })
+
+    def post(self, request):
+        s = BountySerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        b = s.save()
+        return Response({"id": b.id}, status=201)
+
+
+class BountyView(PanelView):
+    def patch(self, request, pk):
+        s = BountySerializer(get_object_or_404(Bounty, pk=pk), data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response({"ok": True})
+
+    def delete(self, request, pk):
+        get_object_or_404(Bounty, pk=pk).delete()
+        return Response(status=204)
+
+
+# --- Rota chatlarini kuzatish (moderatsiya) -------------------------------------------
+
+class ChatsView(PanelView):
+    """Running oqimlardagi rotalar: bugungi xabarlar soni va oxirgisi — qaysi rotada muloqot ketyapti."""
+
+    def get(self, request):
+        today = services.local_now().date()
+        squads = Squad.objects.filter(tribe__cohort__status=Cohort.Status.RUNNING).select_related("tribe__cohort")
+        rows = []
+        for s in squads:
+            msgs = SquadMessage.objects.filter(squad=s, created_at__date=today)
+            last = msgs.select_related("author__user").order_by("-created_at").first()
+            rows.append({
+                "id": s.id, "squad": s.name, "tribe": str(s.tribe), "cohort": s.tribe.cohort.name,
+                "count": msgs.count(),
+                "last": {
+                    "author": (last.author.user.first_name if last.author and last.author.user else "—"),
+                    "text": last.text, "at": last.created_at,
+                } if last else None,
+            })
+        rows.sort(key=lambda r: (r["last"]["at"] if r["last"] else dt.datetime.min.replace(tzinfo=dt.timezone.utc)), reverse=True)
+        return Response(rows)
+
+
+class SquadChatView(PanelView):
+    """Bitta rota chati (bugungi) — admin yomon so'z/kelishmovchilikni ko'rishi uchun."""
+
+    def get(self, request, pk):
+        squad = get_object_or_404(Squad.objects.select_related("tribe__cohort"), pk=pk)
+        today = services.local_now().date()
+        msgs = (
+            SquadMessage.objects.filter(squad=squad, created_at__date=today)
+            .select_related("author__user").order_by("created_at")
+        )
+        return Response({
+            "squad": squad.name, "tribe": str(squad.tribe),
+            "messages": [{
+                "id": msg.id, "author": (msg.author.user.first_name if msg.author and msg.author.user else "—"),
+                "membership_id": msg.author_id, "text": msg.text, "at": msg.created_at,
+            } for msg in msgs],
+        })
+
+
+class ChatMessageView(PanelView):
+    """Yomon xabarni o'chirish."""
+
+    def delete(self, request, pk):
+        get_object_or_404(SquadMessage, pk=pk).delete()
+        return Response(status=204)
 
 
 class VideoFileView(PanelView):

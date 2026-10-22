@@ -1,9 +1,37 @@
+from io import BytesIO
+
+from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Sum
+from PIL import Image, ImageOps
 
 from apps.camp import rules
 from apps.camp.models import Award, Cohort, DayRecord, Membership, Strike
 from apps.camp.services import RuleError, day_progress, local_now, squad_report
+
+try:  # iPhone HEIC/HEIF rasmlarini o'qish uchun (bo'lmasa ham boshqa formatlar ishlaydi)
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except Exception:  # noqa: BLE001
+    pass
+
+
+def normalize_image(upload, max_side=1600):
+    """Yuklangan rasmni JPEG ga keltiradi (iPhone HEIC ham), EXIF burchagini to'g'rilaydi,
+    kattasini kichraytiradi — shunda barcha brauzerlarda ochiladi va joy kam oladi."""
+    if upload is None:
+        raise RuleError("Rasm tanlanmadi.")
+    if getattr(upload, "size", 0) > 25 * 1024 * 1024:
+        raise RuleError("Rasm juda katta (25 MB gacha).")
+    try:
+        img = Image.open(upload)
+        img = ImageOps.exif_transpose(img).convert("RGB")
+    except Exception:  # noqa: BLE001
+        raise RuleError("Bu rasm fayli emas yoki ochib bo'lmadi.")
+    img.thumbnail((max_side, max_side))
+    buf = BytesIO()
+    img.save(buf, "JPEG", quality=85, optimize=True)
+    return ContentFile(buf.getvalue(), name="photo.jpg")
 
 from .models import (
     Bounty, BountyCompletion, CoinTransaction, Fire, PhotoChallenge, PhotoEntry, PhotoVote, Reflection, SquadMessage,
