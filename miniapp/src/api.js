@@ -72,6 +72,25 @@ async function shrinkImage(file, max = 1600) {
   }
 }
 
+/** Profil rasmini olish (blob — <img> sarlavha yubora olmaydi). */
+export async function avatarImage(userId) {
+  const res = await fetch(`${BASE}/avatar/${userId}.jpg`, { headers: { Authorization: authHeader() } });
+  if (!res.ok) throw new Error("avatar yo'q");
+  return URL.createObjectURL(await res.blob());
+}
+
+/** Profil rasmini yuklash (galereyadan ham; HEIC server tomonda JPEG bo'ladi). */
+export async function uploadAvatar(file) {
+  const form = new FormData();
+  form.append("photo", await shrinkImage(file, 800), "avatar.jpg");
+  const res = await fetch(`${BASE}/avatar/`, { method: "POST", headers: { Authorization: authHeader() }, body: form });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.detail || "Rasm yuborilmadi");
+  }
+  return true;
+}
+
 /** 2-topshiriq: iliq suv rasmi. */
 export async function uploadWater(file) {
   const form = new FormData();

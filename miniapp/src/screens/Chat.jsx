@@ -54,9 +54,13 @@ function PlayButton({ media }) {
     );
   }
   return media.kind === "video" ? (
-    <video className="chat-media" src={url} controls playsInline />
+    <video
+      className="chat-media" src={url} controls playsInline
+      controlsList="nodownload noremoteplayback" disablePictureInPicture
+      onContextMenu={(e) => e.preventDefault()}
+    />
   ) : (
-    <audio className="chat-audio" src={url} controls autoPlay />
+    <audio className="chat-audio" src={url} controls controlsList="nodownload" autoPlay onContextMenu={(e) => e.preventDefault()} />
   );
 }
 
@@ -67,7 +71,7 @@ function ReportCard({ it, onReload }) {
   return (
     <div className={`chat-report ${it.me ? "me" : ""} tone-${s.tone}`}>
       <div className="chat-report-head">
-        <Avatar name={it.author} />
+        <Avatar name={it.author} avatar={it.avatar} />
         <div className="chat-report-who">
           <b>{it.author}{it.me && <span className="tag" style={{ marginLeft: 6 }}>siz</span>}</b>
           <small className="muted"><Kind size={12} /> {it.kind === "video" ? "Yurish videosi" : "Ovozli raport"} · {it.day_number}-kun</small>
@@ -112,7 +116,7 @@ function WaterCard({ it }) {
   return (
     <div className={`chat-water ${it.me ? "me" : ""}`}>
       <div className="chat-water-head">
-        <Avatar name={it.author} size={28} />
+        <Avatar name={it.author} avatar={it.avatar} size={28} />
         <b>{it.author}{it.me && <span className="tag" style={{ marginLeft: 6 }}>siz</span>}</b>
         <span className="tag ok"><GlassWater size={11} /> Iliq suv</span>
         <small className="muted num chat-time">{fmtTime(it.at)}</small>
@@ -147,7 +151,7 @@ function SystemItem({ it }) {
 function Bubble({ it }) {
   return (
     <div className={`chat-bubble ${it.me ? "me" : ""}`}>
-      {!it.me && <Avatar name={it.author} size={30} />}
+      {!it.me && <Avatar name={it.author} avatar={it.avatar} size={30} />}
       <div className="chat-bubble-body">
         {!it.me && <b className="chat-bubble-author">{it.author}</b>}
         <p>{it.text}</p>

@@ -179,8 +179,9 @@ MESSAGES = {
     )),
     "review_request": ("Tong", "Video tekshiruv so'rovi", ("name", "day", "phrase"), (
         "🔍 <b>TEKSHIRUV</b> · {name}, {day}-kun\n\n"
-        "O'qilishi kerak bo'lgan gap:\n<blockquote>{phrase}</blockquote>\n"
-        "Shartlar: tashqarida yozilgan, gap aniq o'qilgan.\nHalol baho bering."
+        "Rotadoshingiz yurish videosini yubordi. 📱 <b>«Rota»</b> bo'limiga kiring — videoni ko'ring "
+        "va «Tasdiqlayman / Rad etaman» tugmasini bosing.\n\n"
+        "O'qilishi kerak bo'lgan gap:\n<blockquote>{phrase}</blockquote>"
     )),
     "vote_thanks": ("Tong", "Ovoz berilgani uchun rahmat", (), "Ovozingiz hisobga olindi."),
     "video_approved": ("Tong", "Video tasdiqlandi", ("day",), "✅ Rota videongizni tasdiqladi. {day}-kun yopildi. Zo'r!"),

@@ -1,7 +1,7 @@
 // Umumiy UI bo'laklari: ma'lumot yuklash, toast, tasdiqlash oynasi, avatar, bo'sh holat.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Moon, Smartphone, Sun, Volume2, VolumeX } from "lucide-react";
-import { tg } from "./api.js";
+import { avatarImage, tg } from "./api.js";
 import { sound } from "./sound.js";
 import { getTheme, setTheme } from "./theme.js";
 
@@ -117,10 +117,22 @@ export function Sheet({ icon: Icon, tone = "var(--sun)", title, text, confirm, o
 
 const AVATAR_COLORS = ["#ff7a2f", "#6c7bff", "#22b26b", "#e0559a", "#2eb3d9", "#a26bff", "#d99b1c"];
 
-export function Avatar({ name = "?", size }) {
+/** `avatar` — rasm egasining user_id si (bo'lsa rasm, bo'lmasa ism harfi). */
+export function Avatar({ name = "?", size, avatar }) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    if (!avatar) { setUrl(null); return; }
+    let u, alive = true;
+    avatarImage(avatar).then((x) => { if (alive) { u = x; setUrl(x); } }).catch(() => {});
+    return () => { alive = false; if (u) URL.revokeObjectURL(u); };
+  }, [avatar]);
+  const dim = size && { width: size, height: size };
+  if (url) {
+    return <span className="avatar" aria-label={name} style={{ ...dim, backgroundImage: `url(${url})`, backgroundSize: "cover", backgroundPosition: "center" }} />;
+  }
   const color = AVATAR_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
   return (
-    <span className="avatar" style={{ background: color, ...(size && { width: size, height: size }) }}>
+    <span className="avatar" style={{ background: color, ...dim }}>
       {name.trim()[0]?.toUpperCase() || "?"}
     </span>
   );

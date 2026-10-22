@@ -34,6 +34,8 @@ app_patterns = [
     path("video/", miniapp.VideoUploadView.as_view()),
     path("video/<int:pk>/vote/", miniapp.VideoVoteView.as_view()),
     path("water/", miniapp.WaterUploadView.as_view()),
+    path("avatar/", miniapp.AvatarView.as_view()),
+    path("avatar/<int:pk>.jpg", miniapp.AvatarByIdView.as_view()),
     path("chat/", miniapp.ChatView.as_view()),
     path("media/<str:kind>/<int:pk>/", miniapp.ProofMediaView.as_view()),
     path("feed/", miniapp.FeedView.as_view()),

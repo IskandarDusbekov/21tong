@@ -267,13 +267,17 @@ def window_state(cohort, now):
     return {"open": False, "which": None, "label": nxt_label, "next_open": nxt.strftime("%H:%M")}
 
 
+def _avatar(user):
+    return user.id if user.avatar else None
+
+
 def _voice_item(record, viewer):
     """1-topshiriq: ovozli raport kartasi."""
     m = record.membership
     return {
         "type": "report", "kind": "voice",
         "at": (record.voice_at or record.woke_at).isoformat() if (record.voice_at or record.woke_at) else None,
-        "author": m.user.first_name or str(m.user), "me": m.user_id == viewer.user_id,
+        "author": m.user.first_name or str(m.user), "me": m.user_id == viewer.user_id, "avatar": _avatar(m.user),
         "status": "late" if record.voice_late else "accepted", "late": record.voice_late,
         "admin_reviewed": bool(record.admin_reviewed_at),
         "phrase": record.phrase, "day_number": record.day_number,
@@ -288,7 +292,7 @@ def _video_item(record, video, viewer):
     return {
         "type": "report", "kind": "video",
         "at": (video.uploaded_at or record.woke_at).isoformat(),
-        "author": m.user.first_name or str(m.user), "me": m.user_id == viewer.user_id,
+        "author": m.user.first_name or str(m.user), "me": m.user_id == viewer.user_id, "avatar": _avatar(m.user),
         "status": {"approved": "peer_approved", "rejected": "peer_rejected"}.get(video.status, "pending"),
         "late": False, "admin_reviewed": bool(video.admin_reviewed_at),
         "phrase": record.phrase, "day_number": record.day_number,
@@ -330,7 +334,7 @@ def squad_chat(membership, now=None):
     ):
         u = record.membership.user
         items.append({"type": "water", "at": record.water_at.isoformat(), "id": record.id,
-                      "author": u.first_name or str(u), "me": u.id == viewer_id})
+                      "author": u.first_name or str(u), "me": u.id == viewer_id, "avatar": _avatar(u)})
 
     for s in (
         Strike.objects.filter(membership__squad=squad, created_at__date=date, revoked=False,
@@ -354,7 +358,8 @@ def squad_chat(membership, now=None):
     ):
         author = msg.author.user.first_name if msg.author and msg.author.user.first_name else "Ishtirokchi"
         items.append({"type": "message", "at": msg.created_at.isoformat(), "author": author,
-                      "me": bool(msg.author and msg.author.user_id == viewer_id), "text": msg.text})
+                      "me": bool(msg.author and msg.author.user_id == viewer_id), "text": msg.text,
+                      "avatar": _avatar(msg.author.user) if msg.author else None})
 
     # Kechki refleksiya ham chatda — 🔥 bilan
     reflections = (

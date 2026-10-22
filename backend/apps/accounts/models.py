@@ -55,6 +55,7 @@ class User(AbstractUser):
     gender = models.CharField("Jins", max_length=1, choices=Gender.choices, blank=True)
     region = models.CharField("Viloyat", max_length=20, choices=Region.choices, blank=True)
     goal = models.TextField("Maqsad", blank=True)
+    avatar = models.ImageField("Profil rasmi", upload_to="avatars/", null=True, blank=True)
     # Arizada tanlangan tayyor rota vaqti — tasdiqlanganda shu vaqt bilan rotaga joylashtiriladi
     preferred_slot = models.ForeignKey(
         "camp.WakeSlot", null=True, blank=True, on_delete=models.SET_NULL, related_name="applicants",

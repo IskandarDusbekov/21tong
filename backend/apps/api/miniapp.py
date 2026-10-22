@@ -65,6 +65,8 @@ class MeView(AppView):
                 "joined": user.approved_at.date().isoformat() if user.approved_at else None,
                 "referral_code": user.referral_code,
                 "standing": community.standing(m) if m is not None else None,
+                "user_id": user.id,
+                "has_avatar": bool(user.avatar),
             },
             "upcoming": {
                 **services.placement_payload(upcoming),
@@ -169,6 +171,40 @@ class VideoVoteView(AppView):
         review = get_object_or_404(Review, proof=proof, reviewer=m)
         proof = proofs_services.cast_vote(review, m, bool(request.data.get("approved")))
         return Response({"status": proof.status})
+
+
+class AvatarView(AppView):
+    """Profil rasmi: GET — o'zingiznikini, POST — yangisini yuklash (galereyadan ham, HEIC ham)."""
+
+    def get(self, request):
+        if not request.user.avatar:
+            raise Http404
+        return FileResponse(request.user.avatar.open("rb"), content_type="image/jpeg")
+
+    def post(self, request):
+        request.user.avatar = community.normalize_image(request.FILES.get("photo"), max_side=600)
+        request.user.save(update_fields=["avatar"])
+        return Response({"ok": True}, status=201)
+
+    def delete(self, request):
+        if request.user.avatar:
+            request.user.avatar.delete(save=False)
+            request.user.avatar = None
+            request.user.save(update_fields=["avatar"])
+        return Response(status=204)
+
+
+class AvatarByIdView(AppView):
+    """Rotadosh/qabiladoshning profil rasmi — faqat bir oqimdagilarnikini ko'rish mumkin."""
+
+    def get(self, request, pk):
+        target = get_object_or_404(User, pk=pk)
+        viewer_cohorts = set(request.user.memberships.values_list("cohort_id", flat=True))
+        if pk != request.user.id and not target.memberships.filter(cohort_id__in=viewer_cohorts).exists():
+            raise Http404
+        if not target.avatar:
+            raise Http404
+        return FileResponse(target.avatar.open("rb"), content_type="image/jpeg")
 
 
 class WaterUploadView(AppView):

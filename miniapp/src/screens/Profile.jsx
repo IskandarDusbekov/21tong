@@ -1,7 +1,38 @@
 // "Profil" — shaxsiy karta: kim, qaysi rotada, nechanchi o'rinda; statistika, yo'l va sozlamalar.
-import { CalendarCheck, Coins, Hourglass, MapPin, Medal, Moon, ShieldCheck, Timer, Trophy, UsersRound, Volume2, XCircle } from "lucide-react";
-import { Avatar, ErrorCard, Skeleton, SoundSwitch, ThemeSwitch } from "../ui.jsx";
+import { useRef, useState } from "react";
+import { Camera, CalendarCheck, Coins, Hourglass, MapPin, Medal, Moon, ShieldCheck, Timer, Trophy, UsersRound, Volume2, XCircle } from "lucide-react";
+import { uploadAvatar } from "../api.js";
+import { Avatar, ErrorCard, Skeleton, SoundSwitch, ThemeSwitch, useToast } from "../ui.jsx";
 import Journey, { stageIcon } from "./Journey.jsx";
+
+function AvatarUpload({ me, onChange }) {
+  const input = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const p = me.profile || {};
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    try {
+      await uploadAvatar(file);
+      toast("Profil rasmi yangilandi");
+      onChange?.();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="profile-avatar" style={{ position: "relative", cursor: "pointer" }} onClick={() => !busy && input.current?.click()}>
+      <input ref={input} type="file" accept="image/*" hidden onChange={onFile} />
+      <Avatar name={me.full_name || me.first_name || "?"} size={64} avatar={p.has_avatar ? p.user_id : null} />
+      <span className="avatar-edit" aria-label="Rasmni o'zgartirish"><Camera size={13} /></span>
+    </div>
+  );
+}
 
 const STATUS = {
   pending: "Arizangiz ko'rib chiqilmoqda",
@@ -9,7 +40,7 @@ const STATUS = {
   new: "Ariza hali yuborilmagan",
 };
 
-function Identity({ me }) {
+function Identity({ me, onChange }) {
   const p = me.profile || {};
   const m = me.membership;
   const j = me.journey;
@@ -18,7 +49,7 @@ function Identity({ me }) {
   return (
     <section className="hero profile-hero">
       <div className="profile-id">
-        <div className="profile-avatar"><Avatar name={me.full_name || me.first_name || "?"} size={64} /></div>
+        <AvatarUpload me={me} onChange={onChange} />
         <div style={{ minWidth: 0 }}>
           <h2 className="profile-name">{me.full_name || me.first_name}</h2>
           {sub && <div className="profile-sub"><MapPin size={13} /> {sub}</div>}
@@ -106,13 +137,13 @@ function Settings() {
   );
 }
 
-export default function Profile({ me, error }) {
+export default function Profile({ me, error, reload }) {
   if (error && !me) return <ErrorCard text={error} />;
   if (!me) return <div className="stack"><Skeleton height={170} /><Skeleton height={90} /><Skeleton height={240} /></div>;
   const s = me.profile?.standing;
   return (
     <div>
-      <Identity me={me} />
+      <Identity me={me} onChange={reload} />
       {s && <Score s={s} />}
       {me.membership && <Stats me={me} />}
       <Journey me={me} error={error} embedded />

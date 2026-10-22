@@ -46,7 +46,7 @@ function Main({ dev, onLogout }) {
         {tab === "chat" && <Chat me={me} />}
         {tab === "bounty" && <Bounties me={me} reloadMe={reload} />}
         {tab === "rating" && <Rating />}
-        {tab === "profile" && <Profile me={me} error={error} />}
+        {tab === "profile" && <Profile me={me} error={error} reload={reload} />}
       </main>
       <nav className="tabbar">
         {TABS.map(({ id, label, icon: Icon }) => (
