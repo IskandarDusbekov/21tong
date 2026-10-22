@@ -15,6 +15,7 @@ from apps.camp.awards import render_award
 from apps.camp.models import Award, DayRecord
 from apps.community import services as community
 from apps.community.models import Bounty, PhotoEntry, Reflection
+from apps.proofs import services as proofs_services
 from apps.proofs.models import VideoProof
 
 from .common import membership_summary
@@ -134,8 +135,28 @@ class ProofMediaView(AppView):
             return _stream_telegram_file(record.voice_file_id, "audio/ogg")
         if kind == "video":
             proof = get_object_or_404(VideoProof, pk=pk, day__membership__squad=m.squad_id)
+            if proof.file:  # Mini App ichida yozilgan — lokal fayl
+                ctype = "video/webm" if proof.file.name.endswith(".webm") else "video/mp4"
+                return FileResponse(proof.file.open("rb"), content_type=ctype)
             return _stream_telegram_file(proof.telegram_file_id, "video/mp4")
         raise Http404
+
+
+class VideoUploadView(AppView):
+    """Mini App ichida kameradan yozilgan video raportni qabul qiladi (multipart: video + duration)."""
+
+    def post(self, request):
+        upload = request.FILES.get("video")
+        if not upload:
+            raise exceptions.ValidationError("Video fayl topilmadi.")
+        if upload.size > 25 * 1024 * 1024:
+            raise exceptions.ValidationError("Video juda katta (maksimal 25 MB).")
+        try:
+            duration = max(0, min(int(request.data.get("duration") or 0), 60))
+        except (TypeError, ValueError):
+            duration = 0
+        proof = proofs_services.submit_video_file(self.membership(), upload, duration)
+        return Response({"proof_status": proof.status, "day_number": proof.day.day_number}, status=201)
 
 
 class FreezeView(AppView):

@@ -7,6 +7,7 @@ import { api } from "../api.js";
 import { Avatar, Empty, ErrorCard, haptic, Sheet, Skeleton, useAction, useLoad } from "../ui.jsx";
 import { sound } from "../sound.js";
 import { stageIcon } from "./Journey.jsx";
+import VideoRecorder from "./VideoRecorder.jsx";
 
 /** "Uyg'ondim" marosimi — quyosh portlashi, bir lahzaga to'liq ekran. */
 function WakeRitual() {
@@ -138,7 +139,7 @@ function Link({ icon: Icon, state, title, tag, hint, children }) {
   );
 }
 
-function Chain({ t, gender, rules }) {
+function Chain({ t, gender, rules, onRecord }) {
   const isVideo = t.proof_kind === "video";
   const proofState = !t.woke ? "locked"
     : isVideo ? (t.video === "approved" ? "done" : t.video === "rejected" ? "failed" : "active")
@@ -159,7 +160,7 @@ function Chain({ t, gender, rules }) {
         title={isVideo ? "Video raport — tashqarida" : "Ovozli raport"}
         hint={
           isVideo
-            ? "Tashqariga chiqing, suv iching. Yurib turib gapni o'qigan holda video krujok yozing va botga yuboring. Rotadan 3 kishi tekshiradi."
+            ? "Tashqariga chiqing, suv iching. Yurib turib gapni o'qing va shu yerda 10 soniyalik video yozing. Rotadan 3 kishi tekshiradi."
             : `Gapni ovoz chiqarib o'qing va budilnikdan keyin ${rules.voice_deadline_minutes} daqiqa ichida ovozli xabarni botga yuboring.` + (rules.video_from_day ? ` Video ${rules.video_from_day}-kundan boshlanadi.` : "")
         }
       >
@@ -167,6 +168,11 @@ function Chain({ t, gender, rules }) {
           <div className="quote" style={{ fontStyle: "normal" }}>
             Yuzingizni ko'rsatish shart emas — orqa kamerani yoqing, ovozingiz eshitilsin.
           </div>
+        )}
+        {isVideo && proofState === "active" && (
+          <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} onClick={onRecord}>
+            <Video size={16} /> Video yozish
+          </button>
         )}
       </Link>
     </ol>
@@ -310,6 +316,7 @@ function Upcoming({ u, me }) {
 export default function Today({ me, error, reload }) {
   const [askFreeze, setAskFreeze] = useState(false);
   const [ritual, setRitual] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [run, busy] = useAction(reload);
 
   const doWake = () => {
@@ -350,7 +357,7 @@ export default function Today({ me, error, reload }) {
             </div>
           )}
           {t.woke && !t.proof_done && t.phrase && <OrderCard t={t} />}
-          <Chain t={t} gender={me.gender} rules={me.journey.rules} />
+          <Chain t={t} gender={me.gender} rules={me.journey.rules} onRecord={() => setRecording(true)} />
           {!t.woke && (
             <button className="btn btn-primary btn-xl btn-block wake-btn" disabled={busy} onClick={doWake}>
               <Sun size={22} /> Uyg'ondim
@@ -379,6 +386,9 @@ export default function Today({ me, error, reload }) {
           onConfirm={() => run(() => api.freeze(""), "Ertangi kun muzlatildi. Tuzalib keting!")}
           onClose={() => setAskFreeze(false)}
         />
+      )}
+      {recording && (
+        <VideoRecorder onClose={() => setRecording(false)} onDone={() => { setRecording(false); reload(); }} />
       )}
     </div>
   );

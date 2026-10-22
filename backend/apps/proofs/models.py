@@ -15,7 +15,10 @@ class VideoProof(models.Model):
         REJECTED = "rejected", "Rad etildi"
 
     day = models.OneToOneField(DayRecord, on_delete=models.CASCADE, related_name="video", verbose_name="Kun")
-    telegram_file_id = models.CharField("Telegram fayl ID", max_length=255)
+    # Video ikki manbadan kelishi mumkin: bot orqali (telegram_file_id) yoki
+    # Mini App ichida to'g'ridan-to'g'ri yozib yuklangan (file). Bittasi to'ladi.
+    telegram_file_id = models.CharField("Telegram fayl ID", max_length=255, blank=True, default="")
+    file = models.FileField("Video fayl", upload_to="proofs/videos/", null=True, blank=True)
     duration = models.PositiveSmallIntegerField("Davomiyligi (soniya)", default=0)
     status = models.CharField("Holati", max_length=16, choices=Status.choices, default=Status.REVIEWING)
     uploaded_at = models.DateTimeField("Yuborilgan", auto_now_add=True)

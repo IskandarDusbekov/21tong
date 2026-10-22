@@ -40,7 +40,14 @@ async def deliver(bot: Bot, n):
     elif kind == "rejected":
         await bot.send_message(tg, texts.t("rejected"))
     elif kind == "review_request":
-        await bot.send_video_note(tg, p["file_id"])
+        if p.get("local"):  # Mini App'da yozilgan video — bot yuklab, oddiy video sifatida yuboradi
+            try:
+                data = await backend.review_video_bytes(p["review_id"])
+                await bot.send_video(tg, BufferedInputFile(data, filename="raport.mp4"))
+            except Exception as e:  # noqa: BLE001 — yuklanmasa ham baholash tugmalari boradi
+                log.warning("Tekshiruv videosi yuborilmadi (review %s): %s", p.get("review_id"), e)
+        elif p.get("file_id"):
+            await bot.send_video_note(tg, p["file_id"])
         await bot.send_message(tg, texts.review_request(p), reply_markup=keyboards.review(p["review_id"]))
     elif kind == "video_approved":
         await bot.send_message(tg, texts.t("video_approved", day=p["day_number"]))

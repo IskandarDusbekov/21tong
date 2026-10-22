@@ -36,31 +36,49 @@ def pick_reviewers(membership: Membership, k=None):
     return picked
 
 
-@transaction.atomic
-def submit_video(membership, telegram_file_id, duration=0, now=None):
-    """2-qadam (7-kundan): tashqarida, gapni o'qib yozilgan video krujok botga yuborildi."""
-    now = local_now(now)
+def _proof_day(membership, now):
+    """Bugungi video uchun yozuvni oladi va qoidalarni tekshiradi (ikkala manba uchun umumiy)."""
     record = proof_record(membership, now)
     if not rules.video_required(record.day_number):
         raise RuleError(f"Bugun video shart emas — gapni o'qib, ovozli xabar yuboring. Video {rules.current().video_from_day}-kundan.")
     if hasattr(record, "video"):
         raise RuleError("Bugungi video allaqachon yuborilgan.")
+    return record
 
-    proof = VideoProof.objects.create(day=record, telegram_file_id=telegram_file_id, duration=duration)
+
+def _assign_reviews(proof, membership, record):
+    """Tekshiruvchilarni tayinlab, ularga xabar yuboradi. Tekshiruvchi yo'q bo'lsa — avtomatik tasdiq."""
     reviewers = pick_reviewers(membership)
-    if not reviewers:
-        # Tekshiruvchi yo'q (juda kichik guruh) — avtomatik tasdiq
+    if not reviewers:  # juda kichik guruh — avtomatik tasdiq
         proof.status = VideoProof.Status.APPROVED
         proof.decided_at = timezone.now()
         proof.save(update_fields=["status", "decided_at"])
-        return proof
+        return
     for reviewer in reviewers:
         review = Review.objects.create(proof=proof, reviewer=reviewer)
         notify(
             reviewer.user, Notification.Kind.REVIEW_REQUEST,
-            review_id=review.id, file_id=telegram_file_id,
+            review_id=review.id,
+            file_id=proof.telegram_file_id or None, local=bool(proof.file),
             phrase=record.phrase, name=membership.user.first_name, day_number=record.day_number,
         )
+
+
+@transaction.atomic
+def submit_video(membership, telegram_file_id, duration=0, now=None):
+    """2-qadam (7-kundan): tashqarida, gapni o'qib yozilgan video krujok botga yuborildi."""
+    record = _proof_day(membership, local_now(now))
+    proof = VideoProof.objects.create(day=record, telegram_file_id=telegram_file_id, duration=duration)
+    _assign_reviews(proof, membership, record)
+    return proof
+
+
+@transaction.atomic
+def submit_video_file(membership, upload, duration=0, now=None):
+    """2-qadam: Mini App ichida yozilgan video serverga to'g'ridan-to'g'ri yuklandi (bot orqali emas)."""
+    record = _proof_day(membership, local_now(now))
+    proof = VideoProof.objects.create(day=record, file=upload, duration=duration)
+    _assign_reviews(proof, membership, record)
     return proof
 
 

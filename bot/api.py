@@ -96,6 +96,11 @@ class Backend:
             "POST", f"/reviews/{review_id}/vote/", json={"telegram_id": telegram_id, "approved": approved}
         )
 
+    async def review_video_bytes(self, review_id):
+        """Mini App'da yozilgan video raport faylini yuklab oladi (tekshiruvchiga yuborish uchun)."""
+        resp = await self._request("GET", f"/reviews/{review_id}/video")
+        return resp.content
+
     # --- navbat va jadval ---
     async def notifications(self):
         return await self._json("GET", "/notifications/")

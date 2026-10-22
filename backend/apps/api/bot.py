@@ -1,6 +1,6 @@
 """Bot -> backend API. Hammasi `X-Bot-Secret` bilan himoyalangan."""
 from django.core.management import call_command
-from django.http import HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import exceptions
@@ -208,6 +208,18 @@ class VoteView(BotView):
         voter = get_object_or_404(Membership, user__telegram_id=telegram_id, pk=review.reviewer_id)
         proof = proof_services.cast_vote(review, voter, bool(approved))
         return Response({"proof_id": proof.id, "status": proof.status})
+
+
+class ReviewVideoView(BotView):
+    """Mini App'da yozilgan video raport fayli — bot uni yuklab, tekshiruvchiga Telegram'ga yuboradi."""
+
+    def get(self, request, review_id):
+        review = get_object_or_404(Review.objects.select_related("proof"), pk=review_id)
+        if not review.proof.file:
+            raise Http404
+        name = review.proof.file.name
+        ctype = "video/webm" if name.endswith(".webm") else "video/mp4"
+        return FileResponse(review.proof.file.open("rb"), content_type=ctype)
 
 
 # --- Xabarlar navbati va jadval ------------------------------------------------

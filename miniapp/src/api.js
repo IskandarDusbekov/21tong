@@ -56,6 +56,18 @@ export async function photoImage(id) {
   return URL.createObjectURL(await res.blob());
 }
 
+/** Video raport yuklash — Mini App'da yozilgan, multipart. */
+export async function uploadVideo(blob, duration) {
+  const ext = (blob.type || "").includes("mp4") ? "mp4" : "webm";
+  const form = new FormData();
+  form.append("video", blob, `raport.${ext}`);
+  form.append("duration", String(duration || 0));
+  const res = await fetch(`${BASE}/video/`, { method: "POST", headers: { Authorization: authHeader() }, body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || "Video yuborilmadi");
+  return data;
+}
+
 /** Rasm yuklash — multipart (JSON emas). */
 export async function uploadPhoto(file) {
   const form = new FormData();
