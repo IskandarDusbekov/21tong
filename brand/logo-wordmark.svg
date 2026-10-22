@@ -1,0 +1,36 @@
+<svg viewBox="0 0 680 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="21 Tong — intizom lageri">
+  <defs>
+    <linearGradient id="wsky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14170f"/><stop offset=".55" stop-color="#2a331c"/><stop offset="1" stop-color="#6a3a1e"/>
+    </linearGradient>
+    <linearGradient id="wsun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd988"/><stop offset=".5" stop-color="#f5a637"/><stop offset="1" stop-color="#e2592a"/>
+    </linearGradient>
+    <clipPath id="wrnd"><rect x="20" y="19" width="152" height="152" rx="36"/></clipPath>
+  </defs>
+
+  <!-- Belgi -->
+  <g clip-path="url(#wrnd)">
+    <g transform="translate(20 19) scale(0.297)">
+      <rect width="512" height="512" fill="url(#wsky)"/>
+      <g stroke="url(#wsun)" stroke-width="13" stroke-linecap="round">
+        <line x1="256" y1="300" x2="256" y2="262"/>
+        <line x1="210" y1="312" x2="188" y2="279"/>
+        <line x1="302" y1="312" x2="324" y2="279"/>
+        <line x1="172" y1="340" x2="140" y2="318"/>
+        <line x1="340" y1="340" x2="372" y2="318"/>
+      </g>
+      <circle cx="256" cy="398" r="82" fill="url(#wsun)"/>
+      <text x="256" y="232" text-anchor="middle" font-family="'Segoe UI',system-ui,Arial,sans-serif"
+            font-size="190" font-weight="800" letter-spacing="-6" fill="#fdf6e8">21</text>
+      <path d="M196 470 L256 440 L316 470" fill="none" stroke="#fdf6e8" stroke-width="12"
+            stroke-linecap="round" stroke-linejoin="round" opacity=".92"/>
+    </g>
+  </g>
+
+  <!-- Nom -->
+  <text x="196" y="95" font-family="'Segoe UI',system-ui,Arial,sans-serif" font-size="68" font-weight="800"
+        letter-spacing="-1" fill="#1a1813">21 TONG</text>
+  <text x="199" y="138" font-family="'Segoe UI',system-ui,Arial,sans-serif" font-size="25" font-weight="600"
+        letter-spacing="7" fill="#e2592a">INTIZOM LAGERI</text>
+</svg>

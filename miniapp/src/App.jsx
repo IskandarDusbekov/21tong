@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CircleUserRound, LogOut, MessagesSquare, Sun, Sunrise, Target, Trophy, Wrench } from "lucide-react";
+import { CircleUserRound, LogOut, MessagesSquare, Sun, Target, Trophy, Wrench } from "lucide-react";
 import { api, devUser, inTelegram } from "./api.js";
 import { ToastProvider, useLoad } from "./ui.jsx";
 import Bounties from "./screens/Bounties.jsx";
@@ -66,12 +66,7 @@ function OpenInTelegram() {
     <div className="app">
       <main style={{ display: "flex", minHeight: "70vh", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <div style={{ textAlign: "center", maxWidth: 320 }}>
-          <div style={{
-            width: 56, height: 56, margin: "0 auto 16px", borderRadius: 16, display: "grid", placeItems: "center",
-            background: "linear-gradient(135deg, var(--sun-2), var(--sun))",
-          }}>
-            <Sunrise size={28} color="#fff" />
-          </div>
+          <img src="/logo.svg" alt="21 Tong" width="76" height="76" style={{ margin: "0 auto 16px", display: "block", borderRadius: 20 }} />
           <h2 style={{ margin: "0 0 8px" }}>21 Tong</h2>
           <p style={{ color: "var(--muted)", lineHeight: 1.5, margin: 0 }}>
             Bu ilova Telegram ichida ishlaydi. Botni oching va pastdagi <b>«Menu»</b> tugmasini bosing.
