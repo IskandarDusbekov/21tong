@@ -164,19 +164,22 @@ function ReflectionPrompt({ max, onSent }) {
 }
 
 function WindowBar({ w, roll }) {
-  const Icon = w.which === "evening" ? Moon : Sunrise;
+  const prestart = w.which === "prestart";
+  const Icon = prestart ? Users : w.which === "evening" ? Moon : Sunrise;
   return (
     <div className={`chat-window ${w.open ? "open" : "closed"}`}>
       <div className="chat-window-main">
         {w.open ? <Icon size={16} /> : <Lock size={16} />}
         <div>
-          <b>{w.open ? `${w.label} ochiq` : "Chat yopiq"}</b>
+          <b>{prestart ? "Tanishuv chati ochiq" : w.open ? `${w.label} ochiq` : "Chat yopiq"}</b>
           <small className="muted">
-            {w.open ? `${w.closes_at} gacha yozish mumkin` : <><Eye size={11} /> Faqat kuzatish · {w.label} {w.next_open} da ochiladi</>}
+            {prestart ? "Start'gacha bemalol suhbatlashing"
+              : w.open ? `${w.closes_at} gacha yozish mumkin`
+              : <><Eye size={11} /> Faqat kuzatish · {w.label} {w.next_open} da ochiladi</>}
           </small>
         </div>
       </div>
-      <span className="chat-roll" title="Bugun safda"><Users size={13} /> {roll.done}/{roll.total}</span>
+      <span className="chat-roll" title="Rotada"><Users size={13} /> {prestart ? roll.total : `${roll.done}/${roll.total}`}</span>
     </div>
   );
 }
@@ -221,8 +224,8 @@ export default function Chat({ me }) {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [data?.items?.length]);
 
-  if (!me?.membership) {
-    return <Empty icon={Users} title="Rota chati oqim boshlangach ochiladi" text="Tasdiqlangach, rotangiz shu yerda bo'ladi." />;
+  if (!me?.membership && !me?.upcoming) {
+    return <Empty icon={Users} title="Rota chati tasdiqlangach ochiladi" text="Arizangiz qabul qilingach, rotangiz shu yerda bo'ladi." />;
   }
   if (error && !data) return <ErrorCard text={error} />;
   if (!data) return <div className="stack"><Skeleton height={64} /><Skeleton height={300} /></div>;
@@ -232,7 +235,7 @@ export default function Chat({ me }) {
       <div className="screen-head" style={{ marginBottom: 10 }}>
         <div>
           <h2>{data.squad}</h2>
-          <p className="muted small">{data.tribe} · {data.day_number}-kun</p>
+          <p className="muted small">{data.tribe}{data.prestart ? " · Start oldidan" : ` · ${data.day_number}-kun`}</p>
         </div>
         <div className="window-icon" style={{ background: "var(--sun-soft)", color: "var(--sun)" }}><Flame size={18} /></div>
       </div>
@@ -251,8 +254,14 @@ export default function Chat({ me }) {
       <Composer open={data.window.open} nextOpen={data.window.next_open} onSent={reload} />
 
       <div className="chat-hint small muted">
-        <AlarmClock size={12} /> Raportni botga yuboring — u shu chatda hammaga ko'rinadi.
-        <Clock size={12} style={{ marginLeft: 8 }} /> Kech kelgan raport ham tushadi, lekin hisoblanmaydi.
+        {data.prestart ? (
+          <><Users size={12} /> Rotadoshlaringiz bilan tanishing. Start boshlangach bu yerda tonggi raportlar paydo bo'ladi.</>
+        ) : (
+          <>
+            <AlarmClock size={12} /> Raportni botga yuboring — u shu chatda hammaga ko'rinadi.
+            <Clock size={12} style={{ marginLeft: 8 }} /> Kech kelgan raport ham tushadi, lekin hisoblanmaydi.
+          </>
+        )}
       </div>
     </div>
   );

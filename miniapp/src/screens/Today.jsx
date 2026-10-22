@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
-  AlarmClock, Ban, BedDouble, Check, CheckCircle2, Clock, Coins, Hourglass, Lock, Megaphone, Mic,
-  Moon, Send, ShieldCheck, Snowflake, Sun, Sunrise, Timer, Users, Video, XCircle,
+  AlarmClock, Ban, BedDouble, Check, CheckCircle2, Clock, Coins, Hourglass, Lock, Megaphone,
+  MessagesSquare, Mic, Moon, Send, ShieldCheck, Snowflake, Sun, Sunrise, Timer, Users, Video, XCircle,
 } from "lucide-react";
 import { api } from "../api.js";
 import { Avatar, Empty, ErrorCard, haptic, Sheet, Skeleton, useAction, useLoad } from "../ui.jsx";
@@ -256,26 +256,35 @@ const GUIDE = [
 
 /** Qabul qilingan, lekin oqim hali boshlanmagan: sanoq, rota, yo'riqnoma. */
 function Upcoming({ u, me }) {
+  const left = u.days_left;
+  const starts = left <= 0 ? "Bugun boshlanadi!" : left === 1 ? "Ertaga boshlanadi!" : null;
   return (
     <div>
-      <section className="hero">
+      <section className="hero countdown-hero">
         <div className="hero-top">
           <span><b>{u.squad}</b> · {u.tribe}</span>
           <span className="chip"><Timer size={14} />Start {u.start_date}</span>
         </div>
-        <div className="hero-main">
-          <div className="ring" aria-label={`Startga ${u.days_left} kun`}>
-            <div className="ring-label" style={{ position: "static", height: 96, width: 96, borderRadius: "50%", border: "7px solid rgb(255 255 255 / 16%)" }}>
-              <b className="num">{u.days_left}</b><span>kun qoldi</span>
+        <div className="countdown">
+          <span className="countdown-label">Lager boshlanishiga</span>
+          {starts ? (
+            <b className="countdown-now">{starts}</b>
+          ) : (
+            <div className="countdown-main">
+              <b className="num countdown-num">{left}</b>
+              <span className="countdown-unit">kun<br />qoldi</span>
             </div>
-          </div>
-          <div>
-            <div className="hero-alarm-label"><AlarmClock size={15} />Birinchi budilnik</div>
-            <div className="hero-alarm num">{u.alarm}</div>
-            <div className="hero-sub">Maqsad <b className="num">{u.target}</b> · {u.cohort}</div>
-          </div>
+          )}
+        </div>
+        <div className="countdown-foot">
+          <span><AlarmClock size={14} /> Birinchi budilnik <b className="num">{u.alarm}</b></span>
+          <span>Maqsad <b className="num">{u.target}</b></span>
         </div>
       </section>
+      <div className="banner ok" style={{ marginTop: 12 }}>
+        <div className="banner-icon"><MessagesSquare size={22} /></div>
+        <div><b>Rotangiz bilan tanishing</b><small className="muted">«Rota» bo'limida chat ochiq — start'gacha suhbatlashib oling.</small></div>
+      </div>
       <div className="section-title">Har tong nima qilasiz</div>
       <ol className="chain card">
         {GUIDE.map((g, i) => (

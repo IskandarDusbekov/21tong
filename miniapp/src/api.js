@@ -1,11 +1,27 @@
 // Backend bilan aloqa. Telegram ichida har so'rovga imzolangan initData qo'shiladi.
+// Lokal ishlab chiqishda (faqat `npm run dev`) — tanlangan demo foydalanuvchining telegram_id si.
 const BASE = (import.meta.env.VITE_API_URL || "") + "/api/app";
+const DEV_KEY = "21tong.devUser";
 
 export const tg = window.Telegram?.WebApp;
 export const inTelegram = Boolean(tg?.initData);
 
+export const devUser = {
+  get() {
+    try { return JSON.parse(localStorage.getItem(DEV_KEY)); } catch { return null; }
+  },
+  set(user) {
+    try { localStorage.setItem(DEV_KEY, JSON.stringify(user)); } catch { /* private rejim */ }
+  },
+  clear() {
+    try { localStorage.removeItem(DEV_KEY); } catch { /* e'tiborsiz */ }
+  },
+};
+
 function authHeader() {
-  return inTelegram ? `tma ${tg.initData}` : "";
+  if (inTelegram) return `tma ${tg.initData}`;
+  const dev = import.meta.env.DEV ? devUser.get() : null;
+  return dev ? `dev ${dev.telegram_id}` : "";
 }
 
 async function request(path, { method = "GET", body } = {}) {
@@ -65,4 +81,5 @@ export const api = {
   photos: () => request("/photos/"),
   votePhoto: (id) => request(`/photos/${id}/vote/`, { method: "POST" }),
   ranking: () => request("/leaderboard/"),
+  devUsers: () => request("/dev/users/"),
 };

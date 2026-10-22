@@ -1,52 +1,61 @@
 /*
- * 21 Tong dizayn tizimi — "tong otishi": tungi ko'kdan quyosh rangiga.
- * Telegram ichida tg-theme-* o'zgaruvchilari ustun turadi; brauzerda o'z yorug'/qorong'i mavzumiz.
+ * 21 Tong dizayn tizimi — "tong lageri": harbiy qat'iylik + tong otishi.
+ * Grafit-xaki maydon ustidan ko'tarilgan ember/oltin tong. Yorug' = qumtuproq sahro,
+ * tun = grafit-xaki qarorgoh. Telegram ichida tg-theme-* o'zgaruvchilari ustun turadi.
  */
 :root {
-  --bg: var(--tg-theme-bg-color, #f6f5f2);
-  --surface: var(--tg-theme-secondary-bg-color, #ffffff);
+  --bg: var(--tg-theme-bg-color, #ece5d8);
+  --surface: var(--tg-theme-secondary-bg-color, #fbf9f3);
   --surface-2: color-mix(in srgb, var(--text) 5%, var(--surface));
-  --text: var(--tg-theme-text-color, #16171d);
-  --muted: var(--tg-theme-hint-color, #7c7f8c);
-  --line: color-mix(in srgb, var(--text) 9%, transparent);
+  --text: var(--tg-theme-text-color, #1a1813);
+  --muted: var(--tg-theme-hint-color, #78736a);
+  --line: color-mix(in srgb, var(--text) 11%, transparent);
 
-  --sun: #ff7a2f;
-  --sun-2: #ffb340;
-  --sun-soft: color-mix(in srgb, var(--sun) 14%, transparent);
-  --night: #151a35;
-  --night-2: #2c2457;
+  /* Tong — issiq ember va guruch-oltin (urg'u, harakat) */
+  --sun: #e2592a;
+  --sun-2: #f5a637;
+  --sun-soft: color-mix(in srgb, var(--sun) 15%, transparent);
+  /* Harbiy — zaytun-xaki maydon (struktura, pogon, saf) */
+  --field: #5c6a39;
+  --field-soft: color-mix(in srgb, var(--field) 18%, transparent);
+  --gold: #c69a38;
+  /* Tungi qarorgoh osmoni — grafit-xaki */
+  --night: #15180f;
+  --night-2: #2a331c;
 
-  --ok: #22b26b;
-  --ok-soft: color-mix(in srgb, var(--ok) 14%, transparent);
-  --bad: #ec4b55;
-  --bad-soft: color-mix(in srgb, var(--bad) 14%, transparent);
-  --rest: #6c7bff;
-  --rest-soft: color-mix(in srgb, var(--rest) 14%, transparent);
-  --ice: #2eb3d9;
-  --ice-soft: color-mix(in srgb, var(--ice) 14%, transparent);
+  --ok: #2f9d57;
+  --ok-soft: color-mix(in srgb, var(--ok) 15%, transparent);
+  --bad: #d6433c;
+  --bad-soft: color-mix(in srgb, var(--bad) 15%, transparent);
+  --rest: #5f6de6;
+  --rest-soft: color-mix(in srgb, var(--rest) 15%, transparent);
+  --ice: #2aa7cf;
+  --ice-soft: color-mix(in srgb, var(--ice) 15%, transparent);
 
-  --radius: 18px;
-  --radius-sm: 12px;
-  --shadow: 0 1px 2px rgb(16 18 30 / 4%), 0 6px 20px rgb(16 18 30 / 6%);
+  --radius: 16px;
+  --radius-sm: 11px;
+  --shadow: 0 1px 2px rgb(26 24 19 / 5%), 0 6px 20px rgb(26 24 19 / 7%);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: var(--tg-theme-bg-color, #0e0f15);
-    --surface: var(--tg-theme-secondary-bg-color, #181a23);
-    --text: var(--tg-theme-text-color, #eef0f6);
-    --muted: var(--tg-theme-hint-color, #8b8fa0);
-    --shadow: 0 1px 2px rgb(0 0 0 / 30%);
+    --bg: var(--tg-theme-bg-color, #0f110b);
+    --surface: var(--tg-theme-secondary-bg-color, #191c13);
+    --text: var(--tg-theme-text-color, #efece1);
+    --muted: var(--tg-theme-hint-color, #938f7e);
+    --line: color-mix(in srgb, var(--text) 13%, transparent);
+    --shadow: 0 1px 2px rgb(0 0 0 / 35%);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: var(--tg-theme-bg-color, #0e0f15);
-  --surface: var(--tg-theme-secondary-bg-color, #181a23);
-  --text: var(--tg-theme-text-color, #eef0f6);
-  --muted: var(--tg-theme-hint-color, #8b8fa0);
-  --shadow: 0 1px 2px rgb(0 0 0 / 30%);
+  --bg: var(--tg-theme-bg-color, #0f110b);
+  --surface: var(--tg-theme-secondary-bg-color, #191c13);
+  --text: var(--tg-theme-text-color, #efece1);
+  --muted: var(--tg-theme-hint-color, #938f7e);
+  --line: color-mix(in srgb, var(--text) 13%, transparent);
+  --shadow: 0 1px 2px rgb(0 0 0 / 35%);
   color-scheme: dark;
 }
 
@@ -71,6 +80,7 @@ h2 { font-size: 22px; line-height: 1.2; margin: 8px 0 4px; letter-spacing: -0.01
 
 .card {
   background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 16px;
   box-shadow: var(--shadow);
@@ -95,11 +105,12 @@ button:disabled { cursor: default; }
 /* ---------- Hero (tong osmoni) ---------- */
 .hero {
   position: relative; overflow: hidden; color: #fff;
-  border-radius: 24px; padding: 20px;
+  border-radius: 22px; padding: 20px;
   background:
-    radial-gradient(120% 70% at 50% 120%, var(--sun) 0%, color-mix(in srgb, var(--sun) 40%, transparent) 30%, transparent 62%),
-    linear-gradient(180deg, var(--night) 0%, var(--night-2) 70%, #6a3a5e 100%);
-  box-shadow: 0 10px 30px rgb(21 26 53 / 25%);
+    radial-gradient(130% 78% at 50% 126%, var(--sun) 0%, color-mix(in srgb, var(--sun) 48%, transparent) 24%, transparent 58%),
+    radial-gradient(95% 62% at 50% -12%, var(--field-soft), transparent 62%),
+    linear-gradient(180deg, var(--night) 0%, var(--night-2) 72%, color-mix(in srgb, var(--sun) 32%, var(--night-2)) 100%);
+  box-shadow: 0 12px 32px rgb(10 12 6 / 32%);
 }
 .hero::before { /* yulduzlar */
   content: ""; position: absolute; inset: 0; opacity: .55; pointer-events: none;
@@ -127,6 +138,22 @@ button:disabled { cursor: default; }
 .ring-label { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; line-height: 1.05; }
 .ring-label b { font-size: 28px; }
 .ring-label span { font-size: 11px; opacity: .8; }
+
+/* ---------- Start sanoq (oqim boshlanishidan oldin) ---------- */
+.countdown-hero { text-align: center; }
+.countdown { margin: 20px 0 6px; }
+.countdown-label { font-size: 12px; opacity: .82; letter-spacing: 0.08em; text-transform: uppercase; }
+.countdown-main { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 4px; }
+.countdown-num {
+  font-size: 88px; line-height: .86; font-weight: 800; letter-spacing: -0.04em;
+  background: linear-gradient(180deg, #fff, var(--sun-2)); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.countdown-unit { text-align: left; font-size: 21px; font-weight: 700; line-height: 1.02; opacity: .92; }
+.countdown-now { font-size: 32px; font-weight: 800; display: block; margin-top: 10px; }
+.countdown-foot {
+  display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid rgb(255 255 255 / 15%); font-size: 13px; opacity: .9;
+}
 
 /* ---------- Statistikalar ---------- */
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }

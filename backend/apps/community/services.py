@@ -2,7 +2,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Sum
 
 from apps.camp import rules
-from apps.camp.models import Award, DayRecord, Membership, Strike
+from apps.camp.models import Award, Cohort, DayRecord, Membership, Strike
 from apps.camp.services import RuleError, day_progress, local_now, squad_report
 
 from .models import (
@@ -206,6 +206,9 @@ def vote_photo(membership, entry):
 
 def window_state(cohort, now):
     """Rota chati holati: hozir qaysi oyna ochiq, ochiq bo'lmasa — keyingisi qachon ochiladi."""
+    # Oqim hali boshlanmagan (qabul davri) — chat erkin ochiq, rotadoshlar tanishib oladi.
+    if cohort.status != Cohort.Status.RUNNING:
+        return {"open": True, "which": "prestart", "label": "Start oldidan", "closes_at": None}
     windows = [
         ("morning", "Tonggi oyna", cohort.morning_window_start, cohort.morning_window_end),
         ("evening", "Kechki oyna", cohort.evening_window_start, cohort.evening_window_end),
@@ -307,14 +310,21 @@ def squad_chat(membership, now=None):
         })
 
     items.sort(key=lambda x: x["at"] or "")
-    report = squad_report(squad, date)
     window = window_state(membership.cohort, now)
+    if membership.cohort.status == Cohort.Status.RUNNING:
+        report = squad_report(squad, date)
+        day_number = report["day_number"]
+        roll = {"done": report["done"], "total": report["total"]}
+    else:  # start oldidan — kun raqami yo'q, safda butun rota
+        day_number = 0
+        roll = {"done": 0, "total": squad.memberships.filter(status=Membership.Status.ACTIVE).count()}
     return {
         "squad": squad.name,
         "tribe": str(squad.tribe),
-        "day_number": report["day_number"],
+        "day_number": day_number,
+        "prestart": window.get("which") == "prestart",
         "window": window,
-        "roll": {"done": report["done"], "total": report["total"]},
+        "roll": roll,
         "items": items,
         # Kechki oyna ochiq va bugun refleksiya yozmagan bo'lsa — ilova taklif qiladi
         "can_reflect": window.get("which") == "evening" and not my_reflected,

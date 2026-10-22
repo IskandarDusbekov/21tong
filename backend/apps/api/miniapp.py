@@ -30,6 +30,13 @@ class AppView(APIView):
             raise exceptions.PermissionDenied("Siz hozir faol oqimda emassiz.")
         return m
 
+    def chat_membership(self):
+        """Chat uchun — oqim boshlangan bo'lsa ham, hali boshlanmagan (start kutayotgan) bo'lsa ham."""
+        m = services.active_membership(self.request.user) or services.upcoming_membership(self.request.user)
+        if m is None:
+            raise exceptions.PermissionDenied("Siz hozir faol oqimda emassiz.")
+        return m
+
 
 class MeView(AppView):
     def get(self, request):
@@ -90,10 +97,10 @@ class ChatView(AppView):
     """Rota chati: raportlar, ogohlantirishlar, bosqichlar va matn xabarlari (Telegram guruh o'rniga)."""
 
     def get(self, request):
-        return Response(community.squad_chat(self.membership()))
+        return Response(community.squad_chat(self.chat_membership()))
 
     def post(self, request):
-        msg = community.post_chat_message(self.membership(), request.data.get("text", ""))
+        msg = community.post_chat_message(self.chat_membership(), request.data.get("text", ""))
         return Response({"id": msg.id, "text": msg.text}, status=201)
 
 
