@@ -266,8 +266,11 @@ class CohortActionView(PanelView):
             c.status = Cohort.Status.RECRUITING
             msg = "Qabul ochildi — yangi qabul qilinganlar shu oqimga tushadi."
         elif action == "start":
+            # Qo'lda "start" — oqim BUGUNDAN boshlanadi (1-kun bugun), start sanasi qanday
+            # bo'lishidan qat'i nazar. Shunda "oxirgi kun" kabi xato kun raqami chiqmaydi.
             c.status = Cohort.Status.RUNNING
-            msg = "Oqim boshlandi."
+            c.start_date = services.local_now().date()
+            msg = "Oqim boshlandi — bugun 1-kun."
         elif action == "finish":
             c.status = Cohort.Status.FINISHED
             c.memberships.filter(status=Membership.Status.ACTIVE).update(status=Membership.Status.FINISHED)
@@ -281,7 +284,7 @@ class CohortActionView(PanelView):
             return Response({"detail": "Kunlik hisob bajarildi: kechagi kunlar baholandi, bugungi kunlar ochildi."})
         else:
             raise exceptions.ValidationError({"detail": "Noma'lum amal."})
-        c.save(update_fields=["status"])
+        c.save()
         return Response({"detail": msg})
 
 

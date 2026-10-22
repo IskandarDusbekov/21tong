@@ -49,11 +49,24 @@
     color-scheme: dark;
   }
 }
+/* Foydalanuvchi o'zi tanlagan rejim — Telegram mavzusidan USTUN (literal ranglar,
+   tg-theme fallback'siz), shunda tugma haqiqatan light/night'ni almashtiradi. */
+:root[data-theme="light"] {
+  --bg: #ece5d8;
+  --surface: #fbf9f3;
+  --surface-2: color-mix(in srgb, var(--text) 5%, var(--surface));
+  --text: #1a1813;
+  --muted: #78736a;
+  --line: color-mix(in srgb, var(--text) 11%, transparent);
+  --shadow: 0 1px 2px rgb(26 24 19 / 5%), 0 6px 20px rgb(26 24 19 / 7%);
+  color-scheme: light;
+}
 :root[data-theme="dark"] {
-  --bg: var(--tg-theme-bg-color, #0f110b);
-  --surface: var(--tg-theme-secondary-bg-color, #191c13);
-  --text: var(--tg-theme-text-color, #efece1);
-  --muted: var(--tg-theme-hint-color, #938f7e);
+  --bg: #0f110b;
+  --surface: #191c13;
+  --surface-2: color-mix(in srgb, var(--text) 5%, var(--surface));
+  --text: #efece1;
+  --muted: #938f7e;
   --line: color-mix(in srgb, var(--text) 13%, transparent);
   --shadow: 0 1px 2px rgb(0 0 0 / 35%);
   color-scheme: dark;
