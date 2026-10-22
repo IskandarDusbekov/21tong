@@ -1,39 +1,11 @@
-// Backend bilan aloqa. Telegram ichida har so'rovga imzolangan initData qo'shiladi;
-// oddiy brauzerda (lokal ishlab chiqish) — tanlangan demo foydalanuvchining telegram_id si.
+// Backend bilan aloqa. Telegram ichida har so'rovga imzolangan initData qo'shiladi.
 const BASE = (import.meta.env.VITE_API_URL || "") + "/api/app";
-const DEV_KEY = "21tong.devUser";
 
 export const tg = window.Telegram?.WebApp;
 export const inTelegram = Boolean(tg?.initData);
 
-export const devUser = {
-  get() {
-    try {
-      return JSON.parse(localStorage.getItem(DEV_KEY));
-    } catch {
-      return null;
-    }
-  },
-  set(user) {
-    try {
-      localStorage.setItem(DEV_KEY, JSON.stringify(user));
-    } catch {
-      /* private rejim — sessiya davomida qayta tanlanadi */
-    }
-  },
-  clear() {
-    try {
-      localStorage.removeItem(DEV_KEY);
-    } catch {
-      /* e'tiborsiz */
-    }
-  },
-};
-
 function authHeader() {
-  if (inTelegram) return `tma ${tg.initData}`;
-  const dev = devUser.get();
-  return dev ? `dev ${dev.telegram_id}` : "";
+  return inTelegram ? `tma ${tg.initData}` : "";
 }
 
 async function request(path, { method = "GET", body } = {}) {
@@ -93,5 +65,4 @@ export const api = {
   photos: () => request("/photos/"),
   votePhoto: (id) => request(`/photos/${id}/vote/`, { method: "POST" }),
   ranking: () => request("/leaderboard/"),
-  devUsers: () => request("/dev/users/"),
 };

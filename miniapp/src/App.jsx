@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { LogOut, MessagesSquare, Route, Sun, Target, Trophy, Wrench } from "lucide-react";
-import { api, devUser, inTelegram } from "./api.js";
+import { MessagesSquare, Route, Sun, Sunrise, Target, Trophy } from "lucide-react";
+import { api, inTelegram } from "./api.js";
 import { SoundToggle, ToastProvider, useLoad } from "./ui.jsx";
 import Bounties from "./screens/Bounties.jsx";
 import Chat from "./screens/Chat.jsx";
-import DevLogin from "./screens/DevLogin.jsx";
 import Journey from "./screens/Journey.jsx";
 import Rating from "./screens/Rating.jsx";
 import Today from "./screens/Today.jsx";
@@ -17,7 +16,7 @@ const TABS = [
   { id: "rating", label: "Reyting", icon: Trophy },
 ];
 
-function Main({ dev, onLogout }) {
+function Main() {
   const [tab, setTab] = useState("today");
   const { data: me, error, reload } = useLoad(api.me);
 
@@ -30,14 +29,6 @@ function Main({ dev, onLogout }) {
   return (
     <div className="app">
       <SoundToggle />
-      {dev && (
-        <div className="devbar">
-          <span><Wrench size={14} />Dev: <b>{dev.name}</b> · {dev.gender === "F" ? "qiz" : "yigit"}</span>
-          <button className="btn btn-soft" style={{ padding: "5px 10px", fontSize: 13 }} onClick={onLogout}>
-            <LogOut size={14} /> Almashtirish
-          </button>
-        </div>
-      )}
       <main>
         {tab === "today" && <Today me={me} error={error} reload={reload} />}
         {tab === "chat" && <Chat me={me} />}
@@ -57,16 +48,28 @@ function Main({ dev, onLogout }) {
   );
 }
 
-export default function App() {
-  const [dev, setDev] = useState(() => (inTelegram ? null : devUser.get()));
-
+/** Ilova Telegram tashqarisida (oddiy brauzerda) ochilganda — botga yo'naltiruvchi ekran. */
+function OpenInTelegram() {
   return (
-    <ToastProvider>
-      {!inTelegram && !dev ? (
-        <DevLogin onPick={(u) => { devUser.set(u); setDev(u); }} />
-      ) : (
-        <Main key={dev?.telegram_id} dev={dev} onLogout={() => { devUser.clear(); setDev(null); }} />
-      )}
-    </ToastProvider>
+    <div className="app">
+      <main style={{ display: "flex", minHeight: "70vh", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ textAlign: "center", maxWidth: 320 }}>
+          <div style={{
+            width: 56, height: 56, margin: "0 auto 16px", borderRadius: 16, display: "grid", placeItems: "center",
+            background: "linear-gradient(135deg, #f59e0b, #ef4444)",
+          }}>
+            <Sunrise size={28} color="#fff" />
+          </div>
+          <h2 style={{ margin: "0 0 8px" }}>21 Tong</h2>
+          <p style={{ color: "var(--muted, #8a8f98)", lineHeight: 1.5, margin: 0 }}>
+            Bu ilova Telegram ichida ishlaydi. Botni oching va pastdagi <b>«Menu»</b> tugmasini bosing.
+          </p>
+        </div>
+      </main>
+    </div>
   );
+}
+
+export default function App() {
+  return <ToastProvider>{inTelegram ? <Main /> : <OpenInTelegram />}</ToastProvider>;
 }
