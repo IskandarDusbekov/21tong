@@ -1,4 +1,4 @@
-// "Yo'l" — 4 bosqich, 21 kunlik kalendar va Kaizen budilnik grafigi.
+// "Mening yo'lim" (Profil ichida) — 4 bosqich, 21 kunlik kalendar va Kaizen budilnik grafigi.
 import { BedDouble, Check, Crown, Flame, Medal, Mountain, Shield, Snowflake, Sprout, Star, TrendingDown, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { awardImage } from "../api.js";
@@ -167,20 +167,25 @@ function KaizenChart({ days, rules, target }) {
   );
 }
 
-export default function Journey({ me, error }) {
-  if (error && !me) return <ErrorCard text={error} />;
-  if (!me) return <div className="stack"><Skeleton height={110} /><Skeleton height={300} /></div>;
+/** `embedded` — Profil ichida: o'z sarlavhasisiz, oqim bo'lmasa hech narsa chizmaydi. */
+export default function Journey({ me, error, embedded = false }) {
+  if (error && !me) return embedded ? null : <ErrorCard text={error} />;
+  if (!me) return embedded ? null : <div className="stack"><Skeleton height={110} /><Skeleton height={300} /></div>;
   const j = me.journey;
-  if (!j) return <Empty icon={Sprout} title="Yo'l oqim boshlangach ochiladi" text="Botda /join orqali oqimga qo'shiling." />;
+  if (!j) return embedded ? null : <Empty icon={Sprout} title="Yo'l oqim boshlangach ochiladi" text="Botda /join orqali oqimga qo'shiling." />;
 
   return (
     <div>
-      <div className="screen-head">
-        <div>
-          <h2>Sizning yo'lingiz</h2>
-          <p className="muted small">{j.survived} kun ortda · {j.duration} kunlik lager</p>
+      {embedded ? (
+        <div className="section-title">Mening yo'lim · {j.survived} kun ortda</div>
+      ) : (
+        <div className="screen-head">
+          <div>
+            <h2>Sizning yo'lingiz</h2>
+            <p className="muted small">{j.survived} kun ortda · {j.duration} kunlik lager</p>
+          </div>
         </div>
-      </div>
+      )}
       <NextStage j={j} />
       {me.awards?.length > 0 && (
         <>

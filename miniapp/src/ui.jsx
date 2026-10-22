@@ -1,43 +1,44 @@
 // Umumiy UI bo'laklari: ma'lumot yuklash, toast, tasdiqlash oynasi, avatar, bo'sh holat.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Moon, Sun, Volume2, VolumeX } from "lucide-react";
+import { AlertCircle, CheckCircle2, Moon, Smartphone, Sun, Volume2, VolumeX } from "lucide-react";
 import { tg } from "./api.js";
 import { sound } from "./sound.js";
+import { getTheme, setTheme } from "./theme.js";
 
 export function haptic(type = "success") {
   tg?.HapticFeedback?.notificationOccurred(type);
 }
 
-/** Ovozsiz rejim tugmasi — doimiy, yuqori o'ng burchakda. */
-export function SoundToggle() {
-  const [muted, setMuted] = useState(sound.muted);
+const THEMES = [
+  { id: "", label: "Avto", icon: Smartphone },
+  { id: "light", label: "Yorug'", icon: Sun },
+  { id: "dark", label: "Tungi", icon: Moon },
+];
+
+/** Light/night rejimi — Profil → Sozlamalar. "Avto" Telegram mavzusiga ergashadi. */
+export function ThemeSwitch() {
+  const [theme, set] = useState(getTheme);
   return (
-    <button
-      className="sound-toggle" aria-label={muted ? "Ovozni yoqish" : "Ovozni o'chirish"}
-      onClick={() => setMuted(sound.toggle())}
-    >
-      {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-    </button>
+    <div className="seg seg-accent" role="radiogroup" aria-label="Rejim" style={{ marginBottom: 0 }}>
+      {THEMES.map(({ id, label, icon: Icon }) => (
+        <button
+          key={id || "auto"} role="radio" aria-checked={theme === id} className={theme === id ? "on" : ""}
+          onClick={() => { setTheme(id); set(id); haptic("success"); }}
+        >
+          <Icon size={14} /> {label}
+        </button>
+      ))}
+    </div>
   );
 }
 
-/** Light/night rejimini almashtirish — doimiy, yuqori o'ng burchakda (ovoz tugmasi yonida). */
-export function ThemeToggle() {
-  const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem("21tong.theme") || ""; } catch { return ""; }
-  });
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme) root.dataset.theme = theme; else delete root.dataset.theme;
-    try { localStorage.setItem("21tong.theme", theme); } catch { /* private rejim */ }
-  }, [theme]);
-  const dark = theme ? theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+/** Ovoz belgilari — Profil → Sozlamalar. */
+export function SoundSwitch() {
+  const [muted, setMuted] = useState(sound.muted);
   return (
-    <button
-      className="sound-toggle theme-toggle" aria-label={dark ? "Yorug' rejim" : "Tungi rejim"}
-      onClick={() => setTheme(dark ? "light" : "dark")}
-    >
-      {dark ? <Sun size={16} /> : <Moon size={16} />}
+    <button className={`switch ${muted ? "" : "on"}`} role="switch" aria-checked={!muted} onClick={() => setMuted(sound.toggle())}>
+      {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+      <i />
     </button>
   );
 }

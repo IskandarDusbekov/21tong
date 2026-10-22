@@ -45,6 +45,7 @@
     --text: var(--tg-theme-text-color, #efece1);
     --muted: var(--tg-theme-hint-color, #938f7e);
     --line: color-mix(in srgb, var(--text) 13%, transparent);
+    --field: #9cae68;
     --shadow: 0 1px 2px rgb(0 0 0 / 35%);
     color-scheme: dark;
   }
@@ -68,6 +69,7 @@
   --text: #efece1;
   --muted: #938f7e;
   --line: color-mix(in srgb, var(--text) 13%, transparent);
+  --field: #9cae68;
   --shadow: 0 1px 2px rgb(0 0 0 / 35%);
   color-scheme: dark;
 }
@@ -448,6 +450,20 @@ button:disabled { cursor: default; }
 .chat-bubble-body p { margin: 0; font-size: 14px; word-break: break-word; }
 .chat-bubble-time { font-size: 10px; opacity: .7; display: block; text-align: right; margin-top: 2px; }
 
+.chat-water {
+  background: var(--surface); border-radius: 16px; padding: 10px 12px 12px; box-shadow: var(--shadow);
+  border-left: 3px solid var(--ok); width: 86%;
+}
+.chat-water.me { margin-left: auto; background: linear-gradient(180deg, var(--ok-soft), transparent 70%), var(--surface); }
+.chat-water-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.chat-water-head b { font-size: 14px; }
+.chat-water-head .tag { display: inline-flex; align-items: center; gap: 3px; }
+.chat-water-head .chat-time { margin-left: auto; }
+.chat-water-img {
+  display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; margin-top: 8px;
+  background: var(--surface-2);
+}
+
 .chat-system {
   display: flex; align-items: center; gap: 8px; align-self: center; max-width: 92%;
   padding: 7px 12px; border-radius: 999px; font-size: 13px; background: var(--surface-2);
@@ -524,6 +540,7 @@ button:disabled { cursor: default; }
   font-weight: 700; font-size: 13px; cursor: pointer; transition: background .2s, color .2s;
 }
 .seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.seg-accent button.on { background: var(--sun-soft); color: var(--sun); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sun) 45%, transparent); }
 .btn-sm { padding: 7px 12px; font-size: 13px; }
 
 .rank-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -558,16 +575,77 @@ button:disabled { cursor: default; }
 .vote-btn.on { color: var(--sun); border-color: var(--sun); background: var(--sun-soft); }
 .vote-btn:disabled { opacity: .55; }
 
-/* --- Ovozsiz rejim tugmasi ------------------------------------------------- */
-.sound-toggle {
-  position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); right: 10px; z-index: 60;
-  width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer;
-  display: grid; place-items: center; color: var(--muted);
-  background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(6px);
-  box-shadow: var(--shadow);
+/* --- Kunlik 3 topshiriq ---------------------------------------------------- */
+.tasks { padding: 16px 16px 4px; }
+.tasks-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.tasks-head b { display: block; font-size: 16px; }
+.tasks-head small { display: block; margin-top: 1px; }
+.tasks-coins {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 999px; flex: none;
+  background: color-mix(in srgb, var(--gold) 16%, transparent); color: var(--gold); font-weight: 700;
 }
-.sound-toggle:hover { color: var(--text); }
-.theme-toggle { right: 52px; }
+.tasks-coins b { font-size: 16px; color: var(--text); }
+.tasks .progress { margin: 12px 0 2px; }
+.task-list { list-style: none; margin: 0; padding: 0; }
+.task { display: flex; gap: 12px; padding: 14px 0; align-items: flex-start; }
+.task + .task { border-top: 1px solid var(--line); }
+.task-badge {
+  flex: none; width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center;
+  background: var(--sun-soft); color: var(--sun); transition: background .2s, color .2s;
+}
+.task.done .task-badge { background: var(--ok); color: #fff; }
+.task.failed .task-badge { background: var(--bad-soft); color: var(--bad); }
+.task.review .task-badge { background: color-mix(in srgb, var(--gold) 18%, transparent); color: var(--gold); }
+.task.locked .task-badge { background: var(--surface-2); color: var(--muted); }
+.task.locked .task-title, .task.locked .task-hint { opacity: .6; }
+.task-body { flex: 1; min-width: 0; }
+.task-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.task-n {
+  flex: none; width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center;
+  font-size: 11px; font-weight: 800; background: var(--field-soft); color: var(--field);
+}
+.task-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.task-tags .tag { display: inline-flex; align-items: center; gap: 3px; }
+.task-hint { color: var(--muted); font-size: 13px; margin-top: 4px; line-height: 1.45; }
+.task-btn { margin-top: 10px; }
+.coin-chip {
+  flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 4px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 800; color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent);
+}
+.coin-chip.earned { color: #fff; background: var(--ok); }
+
+/* --- Profil ---------------------------------------------------------------- */
+.profile-hero { padding: 20px 18px 18px; }
+.profile-id { display: flex; align-items: center; gap: 14px; }
+.profile-avatar .avatar { font-size: 26px; box-shadow: 0 0 0 3px rgb(255 255 255 / 22%), 0 6px 20px rgb(0 0 0 / 30%); }
+.profile-name { margin: 0; font-size: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-sub { display: flex; align-items: center; gap: 5px; font-size: 13px; opacity: .8; margin-top: 3px; }
+.profile-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+.profile-score { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; margin-top: 12px; padding: 14px 6px; }
+.profile-score > div { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.profile-score > div + div { border-left: 1px solid var(--line); }
+.profile-score-icon { color: var(--gold); margin-bottom: 4px; }
+.profile-score b { font-size: 22px; line-height: 1.1; }
+.profile-score b span { font-size: 13px; font-weight: 600; }
+.profile-score small { color: var(--muted); font-size: 12px; }
+.stats-4 { grid-template-columns: repeat(2, 1fr); }
+.settings { padding: 2px 16px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; }
+.settings-row + .settings-row { border-top: 1px solid var(--line); }
+.settings-col { flex-direction: column; align-items: stretch; gap: 10px; }
+.settings-label { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.switch { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.switch i {
+  position: relative; width: 44px; height: 26px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--line); transition: background .2s, border-color .2s;
+}
+.switch i::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 25%); transition: transform .2s;
+}
+.switch.on { color: var(--ok); }
+.switch.on i { background: var(--ok); border-color: var(--ok); }
+.switch.on i::after { transform: translateX(18px); }
 
 /* --- "Uyg'ondim" marosimi -------------------------------------------------- */
 .wake-btn { animation: wakePulse 2s ease-in-out infinite; }

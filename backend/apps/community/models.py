@@ -153,6 +153,10 @@ class CoinTransaction(models.Model):
     class Reason(models.TextChoices):
         BOUNTY = "bounty", "Bounty"
         ADMIN = "admin", "Admin"
+        WAKE = "wake", "Vaqtida uyg'ondi"
+        VOICE = "voice", "Ovozli raport"
+        WATER = "water", "Iliq suv"
+        VIDEO = "video", "Yurish videosi"
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="coin_transactions",
                              verbose_name="Foydalanuvchi")
@@ -161,9 +165,16 @@ class CoinTransaction(models.Model):
     bounty_completion = models.OneToOneField(
         BountyCompletion, null=True, blank=True, on_delete=models.SET_NULL, related_name="transaction"
     )
+    # Kunlik topshiriq uchun berilgan tanga — bir kunda har topshiriqqa faqat bir marta.
+    day = models.ForeignKey("camp.DayRecord", null=True, blank=True, on_delete=models.CASCADE,
+                            related_name="coin_transactions", verbose_name="Kun")
     created_at = models.DateTimeField("Vaqt", auto_now_add=True)
 
     class Meta:
         verbose_name = "IrodaCoin amaliyoti"
         verbose_name_plural = "IrodaCoin amaliyotlari"
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["day", "reason"], condition=models.Q(day__isnull=False),
+                                    name="one_task_reward_per_day"),
+        ]

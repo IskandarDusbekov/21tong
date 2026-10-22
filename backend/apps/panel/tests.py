@@ -109,7 +109,20 @@ class PanelDataTests(PanelTestCase):
         self.assertEqual(resp.status_code, 201, resp.content)
         cid = resp.json()["id"]
         self.client.post(f"/api/panel/cohorts/{cid}/action/", {"action": "start"}, format="json")
-        self.assertEqual(Cohort.objects.get(pk=cid).status, Cohort.Status.RUNNING)
+        c = Cohort.objects.get(pk=cid)
+        self.assertEqual(c.status, Cohort.Status.RUNNING)
+        # Qo'lda start — bugundan 1-kun (avval "oqimning oxirgi kuni" xatosi chiqardi)
+        today = services.local_now().date()
+        self.assertEqual(c.start_date, today)
+        self.assertEqual(c.day_number(today), 1)
+
+    def test_cohort_delete_only_when_empty(self):
+        cid = self.client.post("/api/panel/cohorts/", {"name": "Xato oqim", "start_date": "2026-12-01"}, format="json").json()["id"]
+        self.assertEqual(self.client.delete(f"/api/panel/cohorts/{cid}/").status_code, 204)
+        self.assertFalse(Cohort.objects.filter(pk=cid).exists())
+        self.make_member(1)  # self.cohort'da ishtirokchi bor
+        self.assertEqual(self.client.delete(f"/api/panel/cohorts/{self.cohort.id}/").status_code, 400)
+        self.assertTrue(Cohort.objects.filter(pk=self.cohort.id).exists())
 
     def test_broadcast_preview_and_send(self):
         self.make_member(1, "M")
@@ -144,6 +157,18 @@ class PanelSlotsAwardsTests(PanelTestCase):
         self.assertFalse(cohorts[0]["slots"][0]["is_open"])
         r = self.client.post(f"/api/panel/cohorts/{self.cohort.id}/action/", {"action": "clone_next"}, format="json").json()
         self.assertEqual(Cohort.objects.get(pk=r["id"]).slots.count(), 1)
+
+    def test_slot_edit_guards_placed_members(self):
+        url = f"/api/panel/cohorts/{self.cohort.id}/slots/"
+        empty = self.client.post(url, {"start_wake_time": "06:30", "target_wake_time": "05:30"}, format="json").json()
+        ok = self.client.patch(f"/api/panel/slots/{empty['id']}/", {"start_wake_time": "06:45"}, format="json")
+        self.assertEqual(ok.json()["start_wake_time"], "06:45")  # bo'sh rota — vaqt o'zgaradi
+        busy = self.client.post(url, {"start_wake_time": "07:00", "target_wake_time": "05:30"}, format="json").json()
+        self.make_member(1)  # 07:00 → 05:30 rotasiga joylashadi
+        moved = self.client.patch(f"/api/panel/slots/{busy['id']}/", {"start_wake_time": "07:15"}, format="json")
+        self.assertEqual(moved.status_code, 400)
+        renamed = self.client.patch(f"/api/panel/slots/{busy['id']}/", {"title": "Erta qushlar"}, format="json")
+        self.assertEqual(renamed.json()["title"], "Erta qushlar")
 
     def test_stage_preview(self):
         from apps.control.models import Stage

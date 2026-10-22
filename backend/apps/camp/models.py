@@ -175,7 +175,10 @@ class DayRecord(models.Model):
     voice_file_id = models.CharField(max_length=255, blank=True)
     # Kech kelgan raport ham qabul qilinadi (chatga tushadi), lekin kun bajarilgan hisoblanmaydi.
     voice_late = models.BooleanField("Ovozli raport kech keldi", default=False)
-    # Video talab qilinadigan kunlarda raport — proofs.VideoProof orqali
+    # 2-topshiriq: iliq suv ichish odati — Mini App'da rasm bilan isbotlanadi.
+    water_at = models.DateTimeField("Iliq suv ichdi", null=True, blank=True)
+    water_photo = models.ImageField("Iliq suv rasmi", upload_to="proofs/water/", null=True, blank=True)
+    # 3-topshiriq: ko'chada yurish videosi — proofs.VideoProof orqali
 
     # Qo'mondonlik raportni ko'zdan kechirsa — chatda "Admin tekshirdi" yozuvi hammaga ko'rinadi.
     admin_reviewed_at = models.DateTimeField("Admin tekshirdi", null=True, blank=True)

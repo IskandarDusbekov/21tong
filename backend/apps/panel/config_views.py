@@ -12,6 +12,7 @@ from rest_framework.response import Response
 
 from django.http import HttpResponse
 
+from apps.accounts.models import User
 from apps.camp import services
 from apps.camp.awards import render_award, render_preview
 from apps.camp.models import Award, Cohort, Membership, Notification, Squad, WakeSlot
@@ -251,6 +252,16 @@ class CohortsView(PanelView):
 
 
 class CohortView(PanelView):
+    def delete(self, request, pk):
+        """Xato yaratilgan oqimni o'chirish — faqat hali hech kim qo'shilmagan bo'lsa."""
+        c = get_object_or_404(Cohort, pk=pk)
+        if c.memberships.exists():
+            raise exceptions.ValidationError({"detail": "Oqimda ishtirokchilar bor — o'chirib bo'lmaydi. Uni «Yakunlash» mumkin."})
+        if User.objects.filter(preferred_slot__cohort=c, status=User.Status.PENDING).exists():
+            raise exceptions.ValidationError({"detail": "Bu oqimga ariza berganlar bor — avval arizalarni hal qiling."})
+        c.delete()
+        return Response(status=204)
+
     def patch(self, request, pk):
         s = CohortSerializer(get_object_or_404(Cohort, pk=pk), data=request.data, partial=True)
         s.is_valid(raise_exception=True)
@@ -301,8 +312,17 @@ class SlotsView(PanelView):
 
 class SlotView(PanelView):
     def patch(self, request, pk):
-        s = SlotSerializer(get_object_or_404(WakeSlot, pk=pk), data=request.data, partial=True)
+        slot = get_object_or_404(WakeSlot, pk=pk)
+        s = SlotSerializer(slot, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
+        d = s.validated_data
+        time_changed = (d.get("start_wake_time", slot.start_wake_time) != slot.start_wake_time
+                        or d.get("target_wake_time", slot.target_wake_time) != slot.target_wake_time)
+        if time_changed and slot_row(slot)["members"]:
+            raise exceptions.ValidationError({"detail": (
+                "Bu rotaga odamlar joylashgan — vaqtini o'zgartirib bo'lmaydi. "
+                "Nomini o'zgartirish yoki tanlashni yopish mumkin."
+            )})
         return Response(slot_row(s.save()))
 
     def delete(self, request, pk):
@@ -377,6 +397,8 @@ class VideoDecisionView(PanelView):
         v.status = VideoProof.Status.APPROVED if approved else VideoProof.Status.REJECTED
         v.decided_at = timezone.now()
         v.save(update_fields=["status", "decided_at"])
+        if approved:
+            services.award_task(v.day, "video")
         kind = Notification.Kind.VIDEO_APPROVED if approved else Notification.Kind.VIDEO_REJECTED
         services.notify(v.day.membership.user, kind, day_number=v.day.day_number)
         return Response({"detail": "Video tasdiqlandi." if approved else "Video rad etildi."})

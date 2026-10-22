@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
-  AlarmClock, Ban, BedDouble, Check, CheckCircle2, Clock, Coins, Hourglass, Lock, Megaphone,
-  MessagesSquare, Mic, Moon, Send, ShieldCheck, Snowflake, Sun, Sunrise, Timer, Users, Video, XCircle,
+  AlarmClock, Ban, BedDouble, Camera, Check, CheckCircle2, Clock, Coins, Footprints, GlassWater, Hourglass,
+  Lock, Megaphone, MessagesSquare, Mic, Moon, ShieldCheck, Snowflake, Sun, Sunrise, Timer, Users, Video, XCircle,
 } from "lucide-react";
-import { api } from "../api.js";
-import { Avatar, Empty, ErrorCard, haptic, Sheet, Skeleton, useAction, useLoad } from "../ui.jsx";
+import { api, uploadWater } from "../api.js";
+import { Avatar, Empty, ErrorCard, haptic, Sheet, Skeleton, useAction, useLoad, useToast } from "../ui.jsx";
 import { sound } from "../sound.js";
 import { stageIcon } from "./Journey.jsx";
 import VideoRecorder from "./VideoRecorder.jsx";
@@ -122,60 +122,109 @@ export function Windows({ windows }) {
   );
 }
 
-function Link({ icon: Icon, state, title, tag, hint, children }) {
+function CoinChip({ amount, earned }) {
+  if (!amount) return null;
   return (
-    <li className={`link ${state}`}>
-      <div className="link-icon">{state === "done" ? <Check size={20} strokeWidth={3} /> : <Icon size={20} />}</div>
-      <div className="link-body">
-        <div className="link-title">{title}{tag}</div>
-        {hint && <div className="link-hint">{hint}</div>}
+    <span className={`coin-chip ${earned ? "earned" : ""}`} title={earned ? "Tanga olindi" : "Bajarsangiz — tanga"}>
+      {earned ? <Check size={12} strokeWidth={3} /> : <Coins size={12} />}
+      <span className="num">{earned ? amount : `+${amount}`}</span>
+    </span>
+  );
+}
+
+function Task({ n, icon: Icon, state, title, tag, hint, coins, earned, children }) {
+  return (
+    <li className={`task ${state}`}>
+      <div className="task-badge">
+        {state === "done" ? <Check size={18} strokeWidth={3} /> : state === "locked" ? <Lock size={15} /> : <Icon size={19} />}
+      </div>
+      <div className="task-body">
+        <div className="task-title"><span className="task-n num">{n}</span>{title}</div>
+        {tag && <div className="task-tags">{tag}</div>}
+        {hint && <div className="task-hint">{hint}</div>}
         {children}
       </div>
-      <div className="link-state">
-        {state === "locked" && <Lock size={16} />}
-        {state === "done" && <CheckCircle2 size={18} />}
-      </div>
+      <CoinChip amount={coins} earned={earned} />
     </li>
   );
 }
 
-function Chain({ t, gender, rules, onRecord }) {
-  const isVideo = t.proof_kind === "video";
-  const proofState = !t.woke ? "locked"
-    : isVideo ? (t.video === "approved" ? "done" : t.video === "rejected" ? "failed" : "active")
-    : t.voice ? "done" : "active";
-  const proofTag = isVideo && t.video === "reviewing" ? <span className="tag sun"><Hourglass size={11} /> Rota tekshirmoqda</span>
-    : isVideo && t.video === "rejected" ? <span className="tag bad">Rad etildi</span>
-    : !t.proof_done ? <span className="tag num">{t.proof_deadline} gacha</span>
+/** Kunlik 3 topshiriq: ① uyg'onish + ovozli raport, ② iliq suv (rasm), ③ ko'chada yurish (video). */
+function Tasks({ t, gender, rules, onRecord, onWater, waterBusy }) {
+  const c = t.coins || {};
+  const voiceOk = t.voice && !t.voice_late;
+
+  const s1 = !t.woke ? "active" : voiceOk ? "done" : t.voice ? "failed" : "active";
+  const hint1 = !t.woke
+    ? `Budilnikdan keyin ${rules.grace_minutes} daqiqa ichida «Uyg'ondim» tugmasini bosing.`
+    : voiceOk ? "Ovozli raport qabul qilindi."
+    : t.voice ? "Ovozli raport kech keldi — tanga berilmadi."
+    : "Yuqoridagi gapni ovoz chiqarib o'qing va ovozli xabar qilib botga yuboring.";
+  const tag1 = t.woke && !t.voice ? <span className="tag num"><Clock size={11} /> {t.voice_deadline} gacha</span> : null;
+
+  const s2 = !t.woke ? "locked" : t.water ? "done" : "active";
+  const hint2 = !t.woke ? "Uyg'ongach ochiladi."
+    : t.water ? "Rasm yuborildi — organizm uyg'ondi!"
+    : "Bir stakan iliq suv iching va stakanni rasmga oling. Rotangiz ko'radi.";
+
+  const s3 = !t.woke ? "locked"
+    : t.video === "approved" ? "done"
+    : t.video === "rejected" ? "failed"
+    : t.video === "reviewing" ? "review" : "active";
+  const tag3 = t.video === "reviewing" ? <span className="tag sun"><Hourglass size={11} /> Rota tekshirmoqda</span>
+    : t.video === "rejected" ? <span className="tag bad">Rota rad etdi</span>
+    : t.woke && !t.video && t.video_required ? <span className="tag bad num">Majburiy · {t.video_deadline} gacha</span>
     : null;
+  const hint3 = !t.woke ? "Uyg'ongach ochiladi."
+    : t.video === "approved" ? "Video tasdiqlandi. Zo'r yurish!"
+    : t.video === "reviewing" ? "Video rotaga yuborildi — tasdiqlangach tanga beriladi."
+    : t.video === "rejected" ? "Rotadoshlar videoni qabul qilmadi."
+    : "Tashqariga chiqing, yurib turib gapni o'qing va 10 soniyalik video yozing. Rotadan 3 kishi tekshiradi.";
+
+  const states = [s1, s2, s3];
+  const done = states.filter((s) => s === "done").length;
+  const all = Object.values(c);
+  const earnedSum = all.filter((x) => x.earned).reduce((a, x) => a + x.amount, 0);
+  const totalSum = all.reduce((a, x) => a + x.amount, 0);
 
   return (
-    <ol className="chain card">
-      <Link
-        icon={Sun} state={t.woke ? "done" : "active"} title="Uyg'ondim"
-        hint={t.woke ? "Birinchi qadam bosildi. Endi buyruqni bajaring." : `Budilnikdan keyin ${rules.grace_minutes} daqiqa ichida — botdagi tugma yoki shu yerda`}
-      />
-      <Link
-        icon={isVideo ? Video : Mic} state={proofState} tag={proofTag}
-        title={isVideo ? "Video raport — tashqarida" : "Ovozli raport"}
-        hint={
-          isVideo
-            ? "Tashqariga chiqing, suv iching. Yurib turib gapni o'qing va shu yerda 10 soniyalik video yozing. Rotadan 3 kishi tekshiradi."
-            : `Gapni ovoz chiqarib o'qing va budilnikdan keyin ${rules.voice_deadline_minutes} daqiqa ichida ovozli xabarni botga yuboring.` + (rules.video_from_day ? ` Video ${rules.video_from_day}-kundan boshlanadi.` : "")
-        }
-      >
-        {isVideo && gender === "F" && (
-          <div className="quote" style={{ fontStyle: "normal" }}>
-            Yuzingizni ko'rsatish shart emas — orqa kamerani yoqing, ovozingiz eshitilsin.
-          </div>
+    <div className="card tasks">
+      <div className="tasks-head">
+        <div>
+          <b>Bugungi topshiriqlar</b>
+          <small className="muted">{done === 3 ? "Hammasi bajarildi — zo'r!" : `${done}/3 bajarildi`}</small>
+        </div>
+        {totalSum > 0 && (
+          <span className="tasks-coins"><Coins size={15} /><b className="num">{earnedSum}</b><span className="muted num">/{totalSum}</span></span>
         )}
-        {isVideo && proofState === "active" && (
-          <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} onClick={onRecord}>
-            <Video size={16} /> Video yozish
-          </button>
-        )}
-      </Link>
-    </ol>
+      </div>
+      <div className="progress"><i style={{ width: `${Math.max((done / 3) * 100, 3)}%` }} /></div>
+      <ol className="task-list">
+        <Task
+          n={1} icon={Mic} state={s1} title="Uyg'onish va ovozli raport" tag={tag1} hint={hint1}
+          coins={(c.wake?.amount || 0) + (c.voice?.amount || 0)} earned={c.wake?.earned && c.voice?.earned}
+        />
+        <Task n={2} icon={GlassWater} state={s2} title="Iliq suv ichish" hint={hint2} coins={c.water?.amount} earned={c.water?.earned}>
+          {s2 === "active" && (
+            <button className="btn btn-primary btn-sm task-btn" disabled={waterBusy} onClick={onWater}>
+              <Camera size={16} /> {waterBusy ? "Yuborilmoqda…" : "Rasmga olish"}
+            </button>
+          )}
+        </Task>
+        <Task n={3} icon={Footprints} state={s3} title="Ko'chada yurish" tag={tag3} hint={hint3} coins={c.video?.amount} earned={c.video?.earned}>
+          {s3 === "active" && gender === "F" && (
+            <div className="quote" style={{ fontStyle: "normal" }}>
+              Yuzingizni ko'rsatish shart emas — orqa kamerani yoqing, ovozingiz eshitilsin.
+            </div>
+          )}
+          {s3 === "active" && (
+            <button className="btn btn-primary btn-sm task-btn" onClick={onRecord}>
+              <Video size={16} /> Video yozish
+            </button>
+          )}
+        </Task>
+      </ol>
+    </div>
   );
 }
 
@@ -185,11 +234,11 @@ function OrderCard({ t }) {
       <div className="order-head">
         <Megaphone size={16} /> BUYRUQ №{t.day_number}
       </div>
-      <p className="muted small" style={{ margin: "8px 0 6px" }}>Ovoz chiqarib o'qing:</p>
+      <p className="muted small" style={{ margin: "8px 0 6px" }}>Ovoz chiqarib o'qing — ovozli raportda ham, videoda ham:</p>
       <div className="order-phrase">«{t.phrase}»</div>
       <div className="order-foot">
-        <span><Send size={14} /> Raportni <b>botga</b> yuboring</span>
-        <span className="num"><Clock size={14} /> {t.proof_deadline} gacha</span>
+        <span><Mic size={14} /> Ovoz — <b>botga</b></span>
+        <span><Video size={14} /> Video — <b>shu yerda</b></span>
       </div>
     </div>
   );
@@ -254,10 +303,11 @@ function NoMembership({ status }) {
 }
 
 const GUIDE = [
-  { icon: AlarmClock, title: "Bot uyg'otadi", text: (u) => `Budilnik ${u.alarm} da «TURISH!» xabari keladi.` },
-  { icon: Sun, title: "«Uyg'ondim» tugmasi", text: (u) => `Xabar ostidagi tugmani ${u.rules.wake_grace} daqiqa ichida bosing.` },
-  { icon: Mic, title: "Ovozli raport", text: (u) => `Bot bergan gapni ${u.rules.voice_deadline} daqiqa ichida botga ovozli xabar qilib yuboring: 🎙 tugmasini bosib turing, o'qing, qo'yib yuboring.` },
-  { icon: CheckCircle2, title: "Tamom", text: () => "Bot «Raport qabul qilindi» deydi va rotangizga e'lon qiladi." },
+  { icon: AlarmClock, title: "Bot uyg'otadi", text: (u) => `Budilnik ${u.alarm} da «TURISH!» xabari keladi. Ostidagi «Uyg'ondim» tugmasini ${u.rules.wake_grace} daqiqa ichida bosing.` },
+  { icon: Mic, title: "1-topshiriq: ovozli raport", text: (u) => `Bot bergan gapni ${u.rules.voice_deadline} daqiqa ichida ovozli xabar qilib botga yuboring: 🎙 tugmasini bosib turing, o'qing, qo'yib yuboring.` },
+  { icon: GlassWater, title: "2-topshiriq: iliq suv", text: () => "Bir stakan iliq suv iching va «Bugun» bo'limida stakanni rasmga oling." },
+  { icon: Footprints, title: "3-topshiriq: ko'chada yurish", text: () => "Tashqariga chiqing, yurib turib gapni o'qing va «Bugun» bo'limida 10 soniyalik video yozing." },
+  { icon: Coins, title: "Har topshiriq — tanga", text: () => "Bajargan har bir topshiriq uchun IrodaCoin olasiz va reytingda yuqoriga chiqasiz." },
 ];
 
 /** Qabul qilingan, lekin oqim hali boshlanmagan: sanoq, rota, yo'riqnoma. */
@@ -308,7 +358,7 @@ function Upcoming({ u, me }) {
         <div className="banner-icon"><Users size={22} /></div>
         <div><b>Yolg'iz bo'lma</b><small className="muted">Do'stingizni ham chaqiring — birga erta turish osonroq.</small></div>
       </div>
-      {me.awards?.length > 0 && <div className="section-title">Mukofotlaringiz «Yo'l» bo'limida</div>}
+      {me.awards?.length > 0 && <div className="section-title">Mukofotlaringiz «Profil» bo'limida</div>}
     </div>
   );
 }
@@ -317,7 +367,27 @@ export default function Today({ me, error, reload }) {
   const [askFreeze, setAskFreeze] = useState(false);
   const [ritual, setRitual] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [waterBusy, setWaterBusy] = useState(false);
+  const waterInput = useRef(null);
+  const toast = useToast();
   const [run, busy] = useAction(reload);
+
+  const onWaterFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setWaterBusy(true);
+    try {
+      await uploadWater(file);
+      sound.success();
+      toast("Iliq suv qabul qilindi — tanga berildi!");
+      reload();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      setWaterBusy(false);
+    }
+  };
 
   const doWake = () => {
     setRitual(true);
@@ -342,7 +412,8 @@ export default function Today({ me, error, reload }) {
       <Hero me={me} />
       <Stats me={me} />
 
-      <div className="section-title">Bugungi zanjir</div>
+      <input ref={waterInput} type="file" accept="image/*" capture="environment" hidden onChange={onWaterFile} />
+      <div className="section-title">Bugun</div>
       {banner ? (
         <div className={`banner ${banner.tone}`}>
           <div className="banner-icon"><banner.icon size={22} /></div>
@@ -356,8 +427,11 @@ export default function Today({ me, error, reload }) {
               <div><b>Yakshanba</b><small className="muted">Uxlash mumkin. Lekin hammasini bajarsangiz — 1 ta Immunitet.</small></div>
             </div>
           )}
-          {t.woke && !t.proof_done && t.phrase && <OrderCard t={t} />}
-          <Chain t={t} gender={me.gender} rules={me.journey.rules} onRecord={() => setRecording(true)} />
+          {t.woke && t.phrase && (!t.voice || !t.video) && <OrderCard t={t} />}
+          <Tasks
+            t={t} gender={me.gender} rules={me.journey.rules}
+            onRecord={() => setRecording(true)} onWater={() => waterInput.current?.click()} waterBusy={waterBusy}
+          />
           {!t.woke && (
             <button className="btn btn-primary btn-xl btn-block wake-btn" disabled={busy} onClick={doWake}>
               <Sun size={22} /> Uyg'ondim

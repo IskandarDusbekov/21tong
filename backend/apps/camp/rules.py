@@ -59,6 +59,13 @@ def proof_deadline(date: dt.date, alarm: dt.time, tz, day_number: int, c=None) -
     return dt.datetime.combine(date, alarm, tzinfo=tz) + dt.timedelta(minutes=proof_minutes(day_number, c))
 
 
+def task_deadline(date: dt.date, alarm: dt.time, tz, kind: str, c=None) -> dt.datetime:
+    """Har topshiriqning o'z muddati: ovozli raport va yurish videosi alohida (endi ikkalasi ham har kuni)."""
+    c = c or current()
+    mins = c.video_deadline_minutes if kind == "video" else c.voice_deadline_minutes
+    return dt.datetime.combine(date, alarm, tzinfo=tz) + dt.timedelta(minutes=mins)
+
+
 def is_rest_day(date: dt.date, c=None) -> bool:
     """Yakshanba — uxlash mumkin, ogohlantirish berilmaydi (sozlamada o'chirilishi mumkin)."""
     c = c or current()

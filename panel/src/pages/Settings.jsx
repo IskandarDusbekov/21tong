@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlarmClock, Calendar, Lightbulb, RotateCcw, Save, Shield, TrendingDown, Users } from "lucide-react";
+import { AlarmClock, Calendar, Coins, Lightbulb, RotateCcw, Save, Shield, TrendingDown, Users } from "lucide-react";
 import { api } from "../api.js";
 import { ErrorBox, PageHead, Skeleton, Stepper, Switch, useAction, useLoad } from "../ui.jsx";
 
-const ICONS = { "alarm-clock": AlarmClock, "trending-down": TrendingDown, shield: Shield, users: Users, calendar: Calendar };
+const ICONS = { "alarm-clock": AlarmClock, "trending-down": TrendingDown, shield: Shield, users: Users, calendar: Calendar, coins: Coins };
 
 const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 const fromMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;

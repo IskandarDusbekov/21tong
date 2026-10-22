@@ -2,7 +2,7 @@
 // Telegram guruh o'rniga. Chatga yozish faqat oyna ochiq bo'lganda — qolgan vaqt faqat kuzatish.
 import { useEffect, useRef, useState } from "react";
 import {
-  CheckCircle2, Eye, Flame, Hourglass, Lock, Mic, Moon, Play, Send,
+  CheckCircle2, Eye, Flame, GlassWater, Hourglass, Lock, Mic, Moon, Play, Send,
   ShieldCheck, Sparkles, Sunrise, Users, Video, XCircle,
 } from "lucide-react";
 import { api, proofMedia } from "../api.js";
@@ -83,6 +83,30 @@ function ReportCard({ it }) {
   );
 }
 
+/** 2-topshiriq: iliq suv rasmi — rotadoshlar ko'radi. */
+function WaterCard({ it }) {
+  const [url, setUrl] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let u;
+    proofMedia("water", it.id).then((x) => { u = x; setUrl(x); }).catch(() => setFailed(true));
+    return () => u && URL.revokeObjectURL(u);
+  }, [it.id]);
+  return (
+    <div className={`chat-water ${it.me ? "me" : ""}`}>
+      <div className="chat-water-head">
+        <Avatar name={it.author} size={28} />
+        <b>{it.author}{it.me && <span className="tag" style={{ marginLeft: 6 }}>siz</span>}</b>
+        <span className="tag ok"><GlassWater size={11} /> Iliq suv</span>
+        <small className="muted num chat-time">{fmtTime(it.at)}</small>
+      </div>
+      {failed ? <span className="tag bad">Rasm yuklanmadi</span>
+        : url ? <img className="chat-water-img" src={url} alt={`${it.author} — iliq suv`} />
+        : <div className="chat-water-img skeleton" />}
+    </div>
+  );
+}
+
 function SystemItem({ it }) {
   if (it.type === "strike") {
     return (
@@ -138,6 +162,7 @@ function ReflectionCard({ it, onFire }) {
 
 function ChatItem({ it, onFire }) {
   if (it.type === "report") return <ReportCard it={it} />;
+  if (it.type === "water") return <WaterCard it={it} />;
   if (it.type === "message") return <Bubble it={it} />;
   if (it.type === "reflection") return <ReflectionCard it={it} onFire={onFire} />;
   return <SystemItem it={it} />;

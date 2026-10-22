@@ -62,6 +62,7 @@ export const api = {
   cohorts: () => request("/cohorts/"),
   createCohort: (body) => request("/cohorts/", { method: "POST", body }),
   updateCohort: (id, body) => request(`/cohorts/${id}/`, { method: "PATCH", body }),
+  deleteCohort: (id) => request(`/cohorts/${id}/`, { method: "DELETE" }),
   cohortAction: (id, action) => request(`/cohorts/${id}/action/`, { method: "POST", body: { action } }),
   addSlot: (cohortId, body) => request(`/cohorts/${cohortId}/slots/`, { method: "POST", body }),
   updateSlot: (id, body) => request(`/slots/${id}/`, { method: "PATCH", body }),

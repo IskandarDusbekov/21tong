@@ -55,6 +55,13 @@ class MeView(AppView):
         return Response({
             "first_name": user.first_name,
             "full_name": user.display_name,
+            "profile": {
+                "region": user.get_region_display() if user.region else "",
+                "username": user.telegram_username,
+                "joined": user.approved_at.date().isoformat() if user.approved_at else None,
+                "referral_code": user.referral_code,
+                "standing": community.standing(m) if m is not None else None,
+            },
             "upcoming": {
                 **services.placement_payload(upcoming),
                 "rules": {"wake_grace": rules.current().wake_grace_minutes, "voice_deadline": rules.current().voice_deadline_minutes},
@@ -133,6 +140,9 @@ class ProofMediaView(AppView):
         if kind == "voice":
             record = get_object_or_404(DayRecord, pk=pk, membership__squad=m.squad_id)
             return _stream_telegram_file(record.voice_file_id, "audio/ogg")
+        if kind == "water":  # iliq suv rasmi — Mini App'da yuklangan
+            record = get_object_or_404(DayRecord, pk=pk, membership__squad=m.squad_id, water_photo__gt="")
+            return FileResponse(record.water_photo.open("rb"), content_type="image/jpeg")
         if kind == "video":
             proof = get_object_or_404(VideoProof, pk=pk, day__membership__squad=m.squad_id)
             if proof.file:  # Mini App ichida yozilgan — lokal fayl
@@ -140,6 +150,25 @@ class ProofMediaView(AppView):
                 return FileResponse(proof.file.open("rb"), content_type=ctype)
             return _stream_telegram_file(proof.telegram_file_id, "video/mp4")
         raise Http404
+
+
+class WaterUploadView(AppView):
+    """2-topshiriq: iliq suv ichilgani rasmi (multipart: photo)."""
+
+    def post(self, request):
+        upload = request.FILES.get("photo")
+        if not upload:
+            raise exceptions.ValidationError("Rasm topilmadi.")
+        if upload.size > 10 * 1024 * 1024:
+            raise exceptions.ValidationError("Rasm juda katta (maksimal 10 MB).")
+        try:  # haqiqiy rasm ekanini tekshiramiz
+            from PIL import Image
+            Image.open(upload).verify()
+            upload.seek(0)
+        except Exception:
+            raise exceptions.ValidationError("Bu rasm fayli emas.")
+        record = services.record_water(self.membership(), upload)
+        return Response(services.day_progress(record), status=201)
 
 
 class VideoUploadView(AppView):

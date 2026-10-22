@@ -56,6 +56,32 @@ export async function photoImage(id) {
   return URL.createObjectURL(await res.blob());
 }
 
+/** Telefon kamerasi rasmi katta (5–10 MB) — yuborishdan oldin 1600px JPEG ga kichraytiramiz. */
+async function shrinkImage(file, max = 1600) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((ok) => canvas.toBlob(ok, "image/jpeg", 0.85));
+    return blob || file;
+  } catch {
+    return file; // brauzer qo'llamasa — asl fayl
+  }
+}
+
+/** 2-topshiriq: iliq suv rasmi. */
+export async function uploadWater(file) {
+  const form = new FormData();
+  form.append("photo", await shrinkImage(file), "iliq-suv.jpg");
+  const res = await fetch(`${BASE}/water/`, { method: "POST", headers: { Authorization: authHeader() }, body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || "Rasm yuborilmadi");
+  return data;
+}
+
 /** Video raport yuklash — Mini App'da yozilgan, multipart. */
 export async function uploadVideo(blob, duration) {
   const ext = (blob.type || "").includes("mp4") ? "mp4" : "webm";

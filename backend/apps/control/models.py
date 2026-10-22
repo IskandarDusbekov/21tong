@@ -35,8 +35,9 @@ class CampSettings(models.Model):
                                  help_text="Budilnikdan keyin shuncha daqiqa ichida «Uyg'ondim» bosilmasa — kech turdi.")
     voice_deadline_minutes = minutes(5, 1, 120, verbose_name="Ovozli raport muddati (daqiqa)",
                                      help_text="Budilnikdan keyin shuncha daqiqa ichida ovozli raport yuborilishi shart.")
-    video_from_day = minutes(0, 0, 365, verbose_name="Video raport nechanchi kundan",
-                             help_text="0 — video umuman so'ralmaydi, har kuni ovozli raport. Masalan 7 — 7-kundan video krujok.")
+    video_from_day = minutes(0, 0, 365, verbose_name="Yurish videosi nechanchi kundan MAJBURIY",
+                             help_text="Video har kuni yuborilishi mumkin (tanga beriladi). Shu kundan boshlab esa majburiy: "
+                                       "videosiz kun bajarilmagan hisoblanadi. 0 — hech qachon majburiy emas.")
     video_deadline_minutes = minutes(20, 1, 180, verbose_name="Video raport muddati (daqiqa)",
                                      help_text="Video talab qilinadigan kunlarda budilnikdan keyingi muddat.")
     reviewers_per_proof = minutes(3, 1, 10, verbose_name="Videoni nechta rotadosh tekshiradi",
@@ -45,6 +46,16 @@ class CampSettings(models.Model):
         "Tekshirilmagan video tasdiqlangan hisoblansin", default=True,
         help_text="Kun oxirigacha hech kim ovoz bermagan video uchun ishtirokchi jazolanmaydi.",
     )
+
+    # --- Kunlik topshiriqlar uchun IrodaCoin (reytingga qo'shiladi) ---
+    coins_wake = minutes(5, 0, 1000, verbose_name="Vaqtida uyg'onish — tanga",
+                         help_text="«Uyg'ondim» budilnikdan keyin belgilangan vaqt ichida bosilsa.")
+    coins_voice = minutes(5, 0, 1000, verbose_name="Ovozli raport — tanga",
+                          help_text="Ovozli raport muddatida yuborilsa.")
+    coins_water = minutes(5, 0, 1000, verbose_name="Iliq suv (rasm bilan) — tanga",
+                          help_text="Uyg'ongach iliq suv ichib, rasmini Mini App'da yuborsa.")
+    coins_video = minutes(10, 0, 1000, verbose_name="Ko'chada yurish videosi — tanga",
+                          help_text="Video rota tomonidan tasdiqlangach beriladi.")
 
     # --- Kaizen ---
     shift_from_day = minutes(3, 1, 365, verbose_name="Budilnik surilishi nechanchi kundan")
@@ -129,6 +140,7 @@ SETTINGS_GROUPS = [
         "wake_grace_minutes", "voice_deadline_minutes", "video_from_day", "video_deadline_minutes",
         "reviewers_per_proof", "unreviewed_counts_as_approved",
     ]),
+    ("Kunlik topshiriqlar — tangalar", "coins", ["coins_wake", "coins_voice", "coins_water", "coins_video"]),
     ("Kaizen — budilnikni surish", "trending-down", ["shift_from_day", "shift_step_minutes"]),
     ("Jazo va mukofot", "shield", [
         "max_strikes", "sunday_rest", "sunday_immunity", "referral_immunity",

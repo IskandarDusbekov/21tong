@@ -287,44 +287,84 @@ def press_wake(membership, now=None):
     record.woke_at = now
     record.phrase = rules.random_phrase()
     record.save(update_fields=["woke_at", "phrase"])
+    if now <= rules.wake_deadline(record.date, record.alarm_time, now.tzinfo):
+        award_task(record, "wake")
     return record
 
 
-def is_late(record, now):
+# --- Kunlik topshiriqlar uchun tanga ---------------------------------------------------
+
+TASKS = ("wake", "voice", "water", "video")
+
+
+def award_task(record, task):
+    """Topshiriq bajarilgani uchun IrodaCoin — bir kunda har topshiriqqa bir marta (idempotent)."""
+    from apps.community.models import CoinTransaction  # aylanma importdan qochish
+
+    amount = getattr(rules.current(), f"coins_{task}", 0)
+    if amount <= 0:
+        return None
+    tx, _ = CoinTransaction.objects.get_or_create(
+        day=record, reason=task, defaults={"user_id": record.membership.user_id, "amount": amount},
+    )
+    return tx
+
+
+def task_coins(record):
+    """Bugungi har topshiriq uchun: nechta tanga beriladi va olindimi."""
+    c = rules.current()
+    earned = set(record.coin_transactions.values_list("reason", flat=True)) if record.pk else set()
+    return {t: {"amount": getattr(c, f"coins_{t}"), "earned": t in earned} for t in TASKS}
+
+
+def is_late(record, now, kind=None):
+    if kind:
+        return now > rules.task_deadline(record.date, record.alarm_time, now.tzinfo, kind)
     return now > rules.proof_deadline(record.date, record.alarm_time, now.tzinfo, record.day_number)
 
 
-def proof_record(membership, now, allow_late=False):
+def proof_record(membership, now, allow_late=False, kind=None):
     """Raport qabul qilishdan oldingi umumiy tekshiruvlar."""
     record = _today_record(membership, now)
     if not record.woke_at:
         raise RuleError("Avval «Uyg'ondim» tugmasini bosing — keyin o'qiladigan gap beriladi.")
-    if not allow_late and is_late(record, now):
-        raise RuleError(
-            f"Kechikding. Raport budilnikdan keyin {rules.proof_minutes(record.day_number)} daqiqa ichida "
-            "yuborilishi kerak edi."
-        )
+    if not allow_late and is_late(record, now, kind):
+        c = rules.current()
+        mins = (c.video_deadline_minutes if kind == "video" else c.voice_deadline_minutes) if kind \
+            else rules.proof_minutes(record.day_number)
+        raise RuleError(f"Kechikdingiz. Raport budilnikdan keyin {mins} daqiqa ichida yuborilishi kerak edi.")
     return record
 
 
 def record_voice(membership, file_id="", now=None):
     """
-    Ovozli raport: bot bergan gap o'qilgan voice — botga shaxsiy yuboriladi.
-    Kech kelsa ham qabul qilinadi (rota chatiga tushadi), lekin «kech» deb belgilanadi va kun bajarilgan
-    hisoblanmaydi — hamma buni ko'radi.
+    1-topshiriq: ovozli raport — bot bergan gap o'qilgan voice, botga shaxsiy yuboriladi. Endi har kuni
+    (video kunlarida ham). Kech kelsa ham qabul qilinadi (rota chatiga tushadi), lekin «kech» deb
+    belgilanadi, tanga berilmaydi va ovozli kunlarda kun bajarilgan hisoblanmaydi.
     """
     now = local_now(now)
-    record = proof_record(membership, now, allow_late=True)
-    if rules.video_required(record.day_number):
-        raise RuleError(
-            f"{rules.current().video_from_day}-kundan boshlab ovoz emas — tashqarida yozilgan video krujok kerak."
-        )
+    record = proof_record(membership, now, allow_late=True, kind="voice")
     if record.voice_at:
         raise RuleError("Bugungi ovozli raport allaqachon qabul qilingan.")
     record.voice_at = now
     record.voice_file_id = file_id
-    record.voice_late = is_late(record, now)
+    record.voice_late = is_late(record, now, "voice")
     record.save(update_fields=["voice_at", "voice_file_id", "voice_late"])
+    if not record.voice_late:
+        award_task(record, "voice")
+    return record
+
+
+def record_water(membership, upload, now=None):
+    """2-topshiriq: iliq suv ichish odati — uyg'ongach Mini App'da rasm bilan isbotlanadi."""
+    now = local_now(now)
+    record = proof_record(membership, now, allow_late=True)
+    if record.water_at:
+        raise RuleError("Bugungi iliq suv rasmi allaqachon yuborilgan.")
+    record.water_at = now
+    record.water_photo = upload
+    record.save(update_fields=["water_at", "water_photo"])
+    award_task(record, "water")
     return record
 
 
@@ -372,6 +412,11 @@ def day_progress(record: DayRecord):
         "video_required": kind == "video",
         "video": video.status if video else None,
         "proof_done": voice_ok if kind == "voice" else (video is not None and video.status != "rejected"),
+        # Kunlik 3 topshiriq: ① uyg'onish + ovoz, ② iliq suv (rasm), ③ ko'chada yurish (video)
+        "water": bool(record.water_at),
+        "voice_deadline": timezone.localtime(rules.task_deadline(record.date, record.alarm_time, tz, "voice")).strftime("%H:%M"),
+        "video_deadline": timezone.localtime(rules.task_deadline(record.date, record.alarm_time, tz, "video")).strftime("%H:%M"),
+        "coins": task_coins(record),
     }
 
 
@@ -380,7 +425,7 @@ def survived_days(membership):
 
 
 def journey(membership, now=None):
-    """Mini App'dagi "Yo'l" ekrani uchun: bosqichlar, 21 kunlik kalendar, oynalar."""
+    """Mini App'dagi "Profil → Mening yo'lim" uchun: bosqichlar, 21 kunlik kalendar, oynalar."""
     now = local_now(now)
     cohort = membership.cohort
     survived = survived_days(membership)

@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { LogOut, MessagesSquare, Route, Sun, Sunrise, Target, Trophy, Wrench } from "lucide-react";
+import { CircleUserRound, LogOut, MessagesSquare, Sun, Sunrise, Target, Trophy, Wrench } from "lucide-react";
 import { api, devUser, inTelegram } from "./api.js";
-import { SoundToggle, ThemeToggle, ToastProvider, useLoad } from "./ui.jsx";
+import { ToastProvider, useLoad } from "./ui.jsx";
 import Bounties from "./screens/Bounties.jsx";
 import Chat from "./screens/Chat.jsx";
 import DevLogin from "./screens/DevLogin.jsx";
-import Journey from "./screens/Journey.jsx";
+import Profile from "./screens/Profile.jsx";
 import Rating from "./screens/Rating.jsx";
 import Today from "./screens/Today.jsx";
 
@@ -16,9 +16,9 @@ const DEV = import.meta.env.DEV;
 const TABS = [
   { id: "today", label: "Bugun", icon: Sun },
   { id: "chat", label: "Rota", icon: MessagesSquare },
-  { id: "journey", label: "Yo'l", icon: Route },
   { id: "bounty", label: "Bounty", icon: Target },
   { id: "rating", label: "Reyting", icon: Trophy },
+  { id: "profile", label: "Profil", icon: CircleUserRound },
 ];
 
 function Main({ dev, onLogout }) {
@@ -28,13 +28,11 @@ function Main({ dev, onLogout }) {
   const go = (id) => {
     setTab(id);
     window.scrollTo({ top: 0 });
-    if (id === "today" || id === "journey") reload();
+    if (id === "today" || id === "profile") reload();
   };
 
   return (
     <div className="app">
-      <ThemeToggle />
-      <SoundToggle />
       {dev && (
         <div className="devbar">
           <span><Wrench size={14} />Dev: <b>{dev.name}</b> · {dev.gender === "F" ? "qiz" : "yigit"}</span>
@@ -46,9 +44,9 @@ function Main({ dev, onLogout }) {
       <main>
         {tab === "today" && <Today me={me} error={error} reload={reload} />}
         {tab === "chat" && <Chat me={me} />}
-        {tab === "journey" && <Journey me={me} error={error} />}
         {tab === "bounty" && <Bounties me={me} reloadMe={reload} />}
         {tab === "rating" && <Rating />}
+        {tab === "profile" && <Profile me={me} error={error} />}
       </main>
       <nav className="tabbar">
         {TABS.map(({ id, label, icon: Icon }) => (

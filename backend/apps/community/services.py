@@ -112,6 +112,20 @@ def _ranked_members(membership):
     return rows
 
 
+def standing(membership):
+    """Profil uchun: umumiy ball va o'rin — rota ichida va qabila bo'yicha."""
+    rows = sorted(_ranked_members(membership), key=lambda r: -r["points"])
+    me = next((r for r in rows if r["me"]), None)
+    squad_rows = [r for r in rows if r["squad_id"] == membership.squad_id]
+    return {
+        "points": me["points"] if me else 0,
+        "tribe_rank": rows.index(me) + 1 if me else None,
+        "tribe_total": len(rows),
+        "squad_rank": squad_rows.index(me) + 1 if me in squad_rows else None,
+        "squad_total": len(squad_rows),
+    }
+
+
 def ranking(membership):
     """Uch daraja: rota ichidagi shaxslar, rotalar reytingi, qabila eng zo'rlari."""
     rows = _ranked_members(membership)
@@ -267,6 +281,15 @@ def squad_chat(membership, now=None):
         .select_related("membership__user", "video")
     ):
         items.append(_report_item(record, viewer_id))
+
+    # 2-topshiriq: iliq suv rasmlari — rotadoshlar ko'radi
+    for record in (
+        DayRecord.objects.filter(membership__squad=squad, date=date, water_at__isnull=False)
+        .select_related("membership__user")
+    ):
+        u = record.membership.user
+        items.append({"type": "water", "at": record.water_at.isoformat(), "id": record.id,
+                      "author": u.first_name or str(u), "me": u.id == viewer_id})
 
     for s in (
         Strike.objects.filter(membership__squad=squad, created_at__date=date, revoked=False,

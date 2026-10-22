@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from apps.camp import rules
 from apps.camp.models import Membership, Notification
-from apps.camp.services import RuleError, local_now, notify, proof_record
+from apps.camp.services import RuleError, award_task, local_now, notify, proof_record
 
 from .models import Review, VideoProof
 
@@ -37,13 +37,19 @@ def pick_reviewers(membership: Membership, k=None):
 
 
 def _proof_day(membership, now):
-    """Bugungi video uchun yozuvni oladi va qoidalarni tekshiradi (ikkala manba uchun umumiy)."""
-    record = proof_record(membership, now)
-    if not rules.video_required(record.day_number):
-        raise RuleError(f"Bugun video shart emas — gapni o'qib, ovozli xabar yuboring. Video {rules.current().video_from_day}-kundan.")
+    """
+    3-topshiriq (ko'chada yurish videosi) uchun bugungi yozuv. Endi har kuni yuborish mumkin;
+    video majburiy kunlarda (sozlamada) muddat qat'iy, boshqa kunlarda — uyg'ongach istalgan vaqtda.
+    """
+    required = rules.video_required(_today_day_number(membership, now))
+    record = proof_record(membership, now, allow_late=not required, kind="video")
     if hasattr(record, "video"):
         raise RuleError("Bugungi video allaqachon yuborilgan.")
     return record
+
+
+def _today_day_number(membership, now):
+    return membership.cohort.day_number(now.date()) or 0
 
 
 def _assign_reviews(proof, membership, record):
@@ -53,6 +59,7 @@ def _assign_reviews(proof, membership, record):
         proof.status = VideoProof.Status.APPROVED
         proof.decided_at = timezone.now()
         proof.save(update_fields=["status", "decided_at"])
+        award_task(record, "video")
         return
     for reviewer in reviewers:
         review = Review.objects.create(proof=proof, reviewer=reviewer)
@@ -106,6 +113,8 @@ def cast_vote(review: Review, voter: Membership, approved: bool):
         return proof
     proof.decided_at = timezone.now()
     proof.save(update_fields=["status", "decided_at"])
+    if proof.status == VideoProof.Status.APPROVED:
+        award_task(proof.day, "video")
     owner = proof.day.membership.user
     kind = Notification.Kind.VIDEO_APPROVED if proof.status == VideoProof.Status.APPROVED else Notification.Kind.VIDEO_REJECTED
     notify(owner, kind, day_number=proof.day.day_number)

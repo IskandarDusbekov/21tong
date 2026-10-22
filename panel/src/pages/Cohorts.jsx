@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarPlus, CalendarRange, CopyPlus, DoorOpen, Flag, Pencil, Play, Plus, RefreshCw, Timer, Trash2 } from "lucide-react";
+import { CalendarPlus, CalendarRange, Check, CopyPlus, DoorOpen, Flag, Pencil, Play, Plus, RefreshCw, Timer, Trash2 } from "lucide-react";
 import { api } from "../api.js";
 import { Drawer, Empty, ErrorBox, PageHead, Pill, Skeleton, Switch, fmtDate, useAction, useConfirm, useLoad } from "../ui.jsx";
 
@@ -42,11 +42,37 @@ function CohortForm({ initial, onSave, onClose, busy }) {
   );
 }
 
+/** Bitta rota vaqtini tahrirlash (joyida). Odam joylashgan bo'lsa vaqt o'zgarmaydi — backend aytadi. */
+function SlotEdit({ slot, onSave, onCancel, busy }) {
+  const [f, setF] = useState({ start_wake_time: slot.start_wake_time, target_wake_time: slot.target_wake_time, title: slot.title || "" });
+  const locked = slot.members > 0;
+  return (
+    <form className="stack" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); onSave(f); }}>
+      <div className="row" style={{ gap: 6 }}>
+        <input type="time" className="input" value={f.start_wake_time} disabled={locked} onChange={(e) => setF({ ...f, start_wake_time: e.target.value })} aria-label="Boshlang'ich vaqt" />
+        <span className="muted">→</span>
+        <input type="time" className="input" value={f.target_wake_time} disabled={locked} onChange={(e) => setF({ ...f, target_wake_time: e.target.value })} aria-label="Maqsad vaqti" />
+      </div>
+      <input className="input" placeholder="Nomi (ixtiyoriy)" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
+      {locked && <div className="muted small">Bu rotaga odamlar joylashgan — faqat nomini o'zgartirish mumkin.</div>}
+      <div className="row" style={{ gap: 6, justifyContent: "flex-end" }}>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Bekor</button>
+        <button className="btn btn-primary btn-sm" disabled={busy}><Check size={14} /> Saqlash</button>
+      </div>
+    </form>
+  );
+}
+
 /** Tayyor rota vaqtlari — foydalanuvchi arizada shulardan birini tanlaydi. */
 function Slots({ cohort, onChanged }) {
   const confirm = useConfirm();
   const [form, setForm] = useState({ start_wake_time: "06:00", target_wake_time: "05:00", title: "" });
+  const [editing, setEditing] = useState(null);
   const [run, busy] = useAction(onChanged);
+  const saveSlot = (s, f) => {
+    const body = s.members > 0 ? { title: f.title } : f;
+    run(() => api.updateSlot(s.id, body), "Rota vaqti saqlandi.").then((r) => r && setEditing(null));
+  };
   const add = (e) => {
     e.preventDefault();
     run(() => api.addSlot(cohort.id, form), "Rota vaqti qo'shildi.");
@@ -65,11 +91,18 @@ function Slots({ cohort, onChanged }) {
         <div className="alert tone-warn" style={{ marginBottom: 10 }}>Rota vaqti yo'q — foydalanuvchilar ariza oxirida tanlay olmaydi. 3–4 ta qo'shing.</div>
       )}
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 10 }}>
-        {cohort.slots.map((s) => (
+        {cohort.slots.map((s) => editing === s.id ? (
+          <div key={s.id} className="card card-pad" style={{ padding: "12px 14px", boxShadow: "none", outline: "2px solid var(--sun)" }}>
+            <SlotEdit slot={s} busy={busy} onSave={(f) => saveSlot(s, f)} onCancel={() => setEditing(null)} />
+          </div>
+        ) : (
           <div key={s.id} className="card card-pad" style={{ padding: "12px 14px", opacity: s.is_open ? 1 : 0.55, boxShadow: "none" }}>
             <div className="row-between">
               <b className="num" style={{ fontSize: 18 }}>{s.start_wake_time} <span style={{ color: "var(--sun)" }}>→</span> {s.target_wake_time}</b>
-              <button className="btn btn-ghost btn-icon" onClick={() => remove(s)} aria-label="O'chirish"><Trash2 size={15} /></button>
+              <span className="row" style={{ gap: 2 }}>
+                <button className="btn btn-ghost btn-icon" onClick={() => setEditing(s.id)} aria-label="Tahrirlash"><Pencil size={15} /></button>
+                <button className="btn btn-ghost btn-icon" onClick={() => remove(s)} aria-label="O'chirish"><Trash2 size={15} /></button>
+              </span>
             </div>
             {s.title && <div className="small" style={{ fontWeight: 600 }}>{s.title}</div>}
             <div className="row-between small muted" style={{ marginTop: 6 }}>
@@ -101,6 +134,14 @@ export default function Cohorts() {
   const action = async (c, act, ask) => {
     if (ask && !(await confirm(ask))) return;
     run(() => api.cohortAction(c.id, act));
+  };
+  const remove = async (c) => {
+    if (!(await confirm({
+      title: `«${c.name}» oqimini o'chirasizmi?`,
+      text: "Xato yaratilgan oqim uchun. Unga hali hech kim qo'shilmagan — rota vaqtlari bilan birga o'chadi. Qaytarib bo'lmaydi.",
+      confirm: "O'chirish", danger: true,
+    }))) return;
+    run(() => api.deleteCohort(c.id), "Oqim o'chirildi.");
   };
   const save = (f) => run(
     () => (f.id ? api.updateCohort(f.id, f) : api.createCohort(f)),
@@ -154,7 +195,7 @@ export default function Cohorts() {
                 <div><b className="num" style={{ fontSize: 18 }}>{c.squads}</b><div className="muted small">rota</div></div>
               </div>
               <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => setEditing(c)}><Pencil size={14} /> Tahrirlash</button>
+                <button className="btn btn-outline btn-sm" onClick={() => setEditing(c)}><Pencil size={14} /> Tahrirlash</button>
                 <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => action(c, "clone_next", {
                   title: "Keyingi oqimni ochasizmi?",
                   text: `Start ${fmtDate(c.start_date)} dan 7 kun keyin. Shu oqimning chat oynalari va rota vaqtlari ko'chiriladi.`,
@@ -165,8 +206,13 @@ export default function Cohorts() {
                 )}
                 {c.status !== "running" && (
                   <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => action(c, "start", {
-                    title: `«${c.name}» ni hozir boshlaysizmi?`, text: "Odatda oqim boshlanish sanasida avtomatik boshlanadi.", confirm: "Boshlash",
+                    title: `«${c.name}» ni hozir boshlaysizmi?`,
+                    text: "Oqim BUGUNDAN boshlanadi — bugun 1-kun bo'ladi va boshlanish sanasi bugunga o'zgaradi. Odatda oqim belgilangan sanada o'zi boshlanadi.",
+                    confirm: "Bugundan boshlash",
                   })}><Play size={14} /> Boshlash</button>
+                )}
+                {c.members === 0 && (
+                  <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => remove(c)}><Trash2 size={14} /> O'chirish</button>
                 )}
                 {c.status !== "finished" && (
                   <button className="btn btn-bad btn-sm" disabled={busy} onClick={() => action(c, "finish", {

@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -251,17 +252,49 @@ class CampDisciplineTests(CampTestCase):
         self.assertEqual(progress["proof_kind"], "voice")
         self.assertEqual(progress["proof_deadline"], "07:05")  # ovozli raport — 5 daqiqa
 
-    def test_proof_requires_wake_and_right_kind(self):
+    def test_proof_requires_wake_and_both_tasks_daily(self):
+        """Endi har kuni 3 topshiriq: ovoz ham, yurish videosi ham — bir-birini istisno qilmaydi."""
         set_rules(video_from_day=7)
         m = self.make_member(1)
         with self.assertRaises(services.RuleError):
             services.record_voice(m, "v", at(MONDAY, 7, 1))  # "Uyg'ondim" bosilmagan
         services.press_wake(m, at(MONDAY, 7, 0))
-        with self.assertRaises(services.RuleError):
-            proofs.submit_video(m, "f", 10, at(MONDAY, 7, 2))  # 1-kun — video emas, ovoz
+        proofs.submit_video(m, "f", 10, at(MONDAY, 7, 2))  # 1-kun — video ixtiyoriy, lekin qabul
         services.press_wake(m, at(DAY8, 6, 30))
+        rec = services.record_voice(m, "v", at(DAY8, 6, 32))  # 8-kun — video majburiy, ovoz ham qabul
+        self.assertFalse(rec.voice_late)
+
+    def test_required_video_keeps_strict_deadline(self):
+        set_rules(video_from_day=1, video_deadline_minutes=20)
+        m = self.make_member(1)
+        services.press_wake(m, at(MONDAY, 7, 0))
         with self.assertRaises(services.RuleError):
-            services.record_voice(m, "v", at(DAY8, 6, 32))  # 8-kun — ovoz emas, video
+            proofs.submit_video(m, "f", 10, at(MONDAY, 7, 30))  # majburiy kunda 20 daqiqadan kech
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_task_coins_awarded_once(self):
+        set_rules(coins_wake=5, coins_voice=5, coins_water=7, coins_video=10)
+        m = self.make_member(1)
+        rec = services.press_wake(m, at(MONDAY, 7, 1))  # vaqtida — tanga
+        services.press_wake(m, at(MONDAY, 7, 2))  # qayta bosish — yangi tanga yo'q
+        services.record_voice(m, "v", at(MONDAY, 7, 4))  # muddatida — tanga
+        upload = SimpleUploadedFile("w.jpg", b"img", content_type="image/jpeg")
+        services.record_water(m, upload, at(MONDAY, 7, 10))
+        with self.assertRaises(services.RuleError):
+            services.record_water(m, SimpleUploadedFile("w2.jpg", b"img"), at(MONDAY, 7, 11))
+        proof = proofs.submit_video(m, "f", 10, at(MONDAY, 7, 12))  # tekshiruvchi yo'q — avtomatik tasdiq
+        self.assertEqual(proof.status, VideoProof.Status.APPROVED)
+        self.assertEqual(community.coin_balance(m.user), 5 + 5 + 7 + 10)
+        coins = services.day_progress(rec)["coins"]
+        self.assertTrue(all(t["earned"] for t in coins.values()))
+
+    def test_late_tasks_give_no_coins(self):
+        set_rules(coins_wake=5, coins_voice=5)
+        m = self.make_member(1)
+        services.press_wake(m, at(MONDAY, 7, 30))  # 5 daqiqalik muddatdan kech
+        rec = services.record_voice(m, "v", at(MONDAY, 7, 40))  # kech ovoz — qabul, lekin tangasiz
+        self.assertTrue(rec.voice_late)
+        self.assertEqual(community.coin_balance(m.user), 0)
 
     def test_on_time_voice_counts(self):
         m = self.make_member(1)
