@@ -22,6 +22,14 @@ DEBUG = env_bool("DJANGO_DEBUG", True)
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 CSRF_TRUSTED_ORIGINS = [o for o in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o]
 
+# Production (DEBUG=false): backend nginx orqasida HTTPS'da ishlaydi.
+# nginx `X-Forwarded-Proto` yuboradi — Django shu orqali so'rov HTTPS ekanini biladi
+# (CSRF, xavfsiz cookie'lar va to'g'ri static/media URL'lari uchun zarur).
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 INSTALLED_APPS = [
     "config.admin.TongAdminConfig",
     "django.contrib.auth",
@@ -101,9 +109,9 @@ TIME_ZONE = os.getenv("TIME_ZONE", "Asia/Tashkent")
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

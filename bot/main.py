@@ -4,7 +4,14 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat
+from aiogram.types import (
+    BotCommand,
+    BotCommandScopeAllPrivateChats,
+    BotCommandScopeChat,
+    MenuButtonCommands,
+    MenuButtonWebApp,
+    WebAppInfo,
+)
 
 import config
 import tasks
@@ -32,6 +39,14 @@ async def setup_commands(bot: Bot):
             await bot.set_my_commands(ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin))
         except Exception as e:  # admin hali botga /start bosmagan
             log.warning("Admin %s uchun buyruqlar o'rnatilmadi: %s", admin, e)
+    # MINI_APP_URL (HTTPS) berilsa — doimiy «Menu» tugmasi Mini App'ni ochadi (BotFather'da
+    # qo'lda sozlash shart emas). Bo'lmasa — oddiy buyruqlar menyusi.
+    if config.MINI_APP_URL:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="Mini App", web_app=WebAppInfo(url=config.MINI_APP_URL))
+        )
+    else:
+        await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
 
 async def main():

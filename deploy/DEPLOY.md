@@ -1,8 +1,13 @@
-# 21tong — serverga joylash (hozircha IP bilan, arizalar uchun)
+# 21tong — serverga joylash
 
-Maqsad: **bot + backend** ni serverda ishga tushirish, arizalarni oldindan qabul qila boshlash.
-Adminlar arizani **Telegram'dagi ✅/❌ tugmalari** bilan tasdiqlaydi — veb-panel hozircha shart emas.
-Mini App (HTTPS kerak), domen, SSL, nginx va Docker — **ertaga** (pastda eslatma bor).
+Ikki bosqich:
+
+- **1–7-qadamlar** (pastda): bot + backend ni IP bilan ishga tushirish — arizalarni darhol qabul
+  qilish uchun yetarli. Adminlar arizani **Telegram'dagi ✅/❌ tugmalari** bilan tasdiqlaydi.
+- **«Domen + SSL + Mini App»** (eng oxirda): domen ulab, Mini App, panel va admin'ni HTTPS orqali
+  to'liq ishga tushirish.
+
+Agar domeningiz tayyor bo'lsa — avval 1–7 ni, keyin oxirgi bo'limni bajaring.
 
 Quyidagilar **serverda** (SSH orqali) bajariladi. `ubuntu` va yo'llarni o'zingiznikiga moslang.
 
@@ -117,15 +122,82 @@ cd backend && ../venv/bin/python manage.py migrate
 sudo systemctl restart 21tong-backend 21tong-bot
 ```
 
-## Ertaga: domen + SSL + Mini App
+## Domen + SSL + Mini App (to'liq ishga tushirish)
 
-Domen serverga ulanib, SSL (masalan Certbot) olingach:
+Domen (masalan `21tong.uz`) serverning IP'siga **A-yozuv** bilan ulangan bo'lsin (DNS). Bu bo'lim
+botni, Mini App'ni, panel va admin'ni bitta domenda HTTPS orqali ochadi. Quyida `21tong.uz` o'rniga
+o'z domeningizni, `/home/ubuntu` o'rniga o'z yo'lingizni qo'ying.
 
-1. nginx o'rnatib, `backend` ni `127.0.0.1:8000` dan HTTPS orqali `proxy_pass` qiling; `/static/` va
-   `/media/` ni ulang (`manage.py collectstatic`).
-2. Mini App'ni build qilib (`cd miniapp && npm ci && npm run build`) `https://<domen>/` da bering.
-3. `.env` da `MINI_APP_URL=https://<domen>` qo'ying va BotFather → **Menu Button / Web App** ga o'sha
-   manzilni yozing. Botni qayta ishga tushiring — alarm va menyuda «📱 Mini App» tugmasi paydo bo'ladi.
-4. Veb-panel (`/panel/`) va `/admin/` ni ham nginx orqali bering.
+### 1. Frontend'larni build qilish (Node.js kerak)
 
-> Hozircha bularsiz ham arizalar to'liq ishlaydi — adminlar Telegram tugmalari bilan tasdiqlaydi.
+```bash
+sudo apt install -y nodejs npm
+cd ~/21tong/miniapp && npm ci && npm run build
+cd ~/21tong/panel   && npm ci && npm run build
+```
+
+### 2. Django static fayllarini yig'ish
+
+```bash
+cd ~/21tong/backend && ../venv/bin/python manage.py collectstatic --noinput
+```
+
+### 3. `.env` ni production'ga moslash
+
+```
+DJANGO_DEBUG=false
+DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost,21tong.uz,www.21tong.uz
+DJANGO_CSRF_TRUSTED_ORIGINS=https://21tong.uz,https://www.21tong.uz
+MINI_APP_URL=https://21tong.uz
+```
+
+> `MINI_APP_URL` o'rnatilgach bot doimiy «Menu» tugmasini avtomatik Mini App'ga bog'laydi —
+> BotFather'da qo'lda sozlash shart emas.
+
+### 4. nginx o'rnatish va config
+
+```bash
+sudo apt install -y nginx
+sudo cp ~/21tong/deploy/nginx-21tong.conf /etc/nginx/sites-available/21tong
+sudo sed -i 's/SIZNING_DOMEN/21tong.uz/g' /etc/nginx/sites-available/21tong   # domeningizni qo'ying
+sudo ln -sf /etc/nginx/sites-available/21tong /etc/nginx/sites-enabled/21tong
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+> `nginx-21tong.conf` ichidagi `/home/ubuntu` yo'li boshqa bo'lsa — faylni ochib to'g'rilang.
+
+### 5. SSL sertifikat (Let's Encrypt — bepul, avtomatik)
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d 21tong.uz -d www.21tong.uz
+```
+
+Certbot HTTPS (443) blokini va HTTP→HTTPS yo'naltirishni **o'zi qo'shadi**; sertifikat avtomatik
+yangilanadi (`sudo certbot renew --dry-run` bilan tekshiring).
+
+### 6. Backend va botni qayta ishga tushirish
+
+```bash
+sudo systemctl restart 21tong-backend 21tong-bot
+```
+
+### 7. Tekshirish
+
+- `https://21tong.uz/` — Mini App ochiladi (brauzerda "Dev kirish" `DEBUG=false` da o'chiq bo'ladi —
+  bu normal; Mini App faqat Telegram ichida to'liq ishlaydi).
+- `https://21tong.uz/panel/` — boshqaruv paneli (admin login bilan).
+- `https://21tong.uz/admin/` — Django admin.
+- Telegram'da botning pastidagi **«Menu»** tugmasi Mini App'ni ochadi.
+
+### Kodni yangilaganda (domen bilan)
+
+```bash
+cd ~/21tong && git pull
+./venv/bin/pip install -r backend/requirements.txt -r bot/requirements.txt
+cd backend && ../venv/bin/python manage.py migrate && ../venv/bin/python manage.py collectstatic --noinput
+cd ../miniapp && npm ci && npm run build
+cd ../panel   && npm ci && npm run build
+sudo systemctl restart 21tong-backend 21tong-bot
+```
