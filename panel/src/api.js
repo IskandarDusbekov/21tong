@@ -57,6 +57,7 @@ export const api = {
   memberAction: (id, body) => request(`/members/${id}/action/`, { method: "POST", body }),
   squads: (query) => request("/squads/", { query }),
   videos: (status) => request("/videos/", { query: { status } }),
+  videoUrl: (id) => `/api/panel/videos/${id}/watch`,
   videoDecide: (id, decision) => request(`/videos/${id}/${decision}/`, { method: "POST" }),
 
   cohorts: () => request("/cohorts/"),

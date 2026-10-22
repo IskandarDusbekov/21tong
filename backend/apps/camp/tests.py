@@ -159,6 +159,28 @@ class ReviewTests(CampTestCase):
         with self.assertRaises(services.RuleError):
             proofs.cast_vote(review, members[0], True)
 
+    def test_chat_shows_video_with_review_controls(self):
+        """Rotadagi video chatda ko'rinadi; tekshiruvchiga tasdiq tugmasi (can_review)."""
+        members = [self.make_member(i) for i in range(1, 5)]
+        proof = self.complete_morning(members[0], DAY8)
+        reviewer = proof.reviews.first().reviewer
+        now = at(DAY8, 7, 0)
+        # Egasining o'zi — tasdiqlay olmaydi
+        own = next(it for it in community.squad_chat(members[0], now)["items"]
+                   if it["kind"] == "video" and it["me"])
+        self.assertFalse(own["can_review"])
+        self.assertEqual(own["proof_id"], proof.id)
+        # Tekshiruvchi — tasdiqlay oladi
+        vid = next(it for it in community.squad_chat(reviewer, now)["items"]
+                   if it["kind"] == "video" and not it["me"])
+        self.assertTrue(vid["can_review"])
+        # Boshqa rotadosh (tekshiruvchi emas) — tugma yo'q
+        other = next((m for m in members if m.id not in (members[0].id, reviewer.id)
+                      and not proof.reviews.filter(reviewer=m).exists()), None)
+        if other:
+            row = next(it for it in community.squad_chat(other, now)["items"] if it["kind"] == "video")
+            self.assertFalse(row["can_review"])
+
 
 class EvaluationTests(CampTestCase):
     def evaluate(self, m, date):

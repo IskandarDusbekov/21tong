@@ -514,6 +514,13 @@ button:disabled { cursor: default; }
 }
 .recorder-actions { display: flex; gap: 10px; width: 100%; max-width: 360px; }
 .recorder-actions .btn { flex: 1; }
+.recorder-shot { border-color: #fff; color: var(--ok); }
+.recorder-shot:active { transform: scale(.94); }
+
+/* Video tasdiqlash (rota chatida, tekshiruvchi uchun) */
+.chat-review { display: flex; gap: 8px; margin-top: 10px; }
+.chat-review .btn { flex: 1; padding: 9px; }
+.chat-voted { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 13px; font-weight: 600; }
 
 /* --- Kechki refleksiya (chat ichida) --------------------------------------- */
 .chat-reflection {

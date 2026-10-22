@@ -239,28 +239,36 @@ def window_state(cohort, now):
     return {"open": False, "which": None, "label": nxt_label, "next_open": nxt.strftime("%H:%M")}
 
 
-def _report_item(record, viewer_id):
-    p = day_progress(record)
+def _voice_item(record, viewer):
+    """1-topshiriq: ovozli raport kartasi."""
     m = record.membership
-    if p["proof_kind"] == "video":
-        media = {"kind": "video", "id": record.video.id} if getattr(record, "video", None) else None
-        status = {"approved": "peer_approved", "rejected": "peer_rejected"}.get(p["video"], "pending")
-    else:
-        media = {"kind": "voice", "id": record.id} if record.voice_file_id else None
-        status = "late" if p["voice_late"] else "accepted"
-    at = record.voice_at or getattr(getattr(record, "video", None), "uploaded_at", None) or record.woke_at
     return {
-        "type": "report",
-        "at": at.isoformat() if at else None,
-        "author": m.user.first_name or str(m.user),
-        "me": m.user_id == viewer_id,
-        "kind": p["proof_kind"],
-        "status": status,
-        "late": p["voice_late"],
-        "admin_reviewed": p["admin_reviewed"],
-        "phrase": record.phrase,
-        "day_number": record.day_number,
-        "media": media,
+        "type": "report", "kind": "voice",
+        "at": (record.voice_at or record.woke_at).isoformat() if (record.voice_at or record.woke_at) else None,
+        "author": m.user.first_name or str(m.user), "me": m.user_id == viewer.user_id,
+        "status": "late" if record.voice_late else "accepted", "late": record.voice_late,
+        "admin_reviewed": bool(record.admin_reviewed_at),
+        "phrase": record.phrase, "day_number": record.day_number,
+        "media": {"kind": "voice", "id": record.id} if record.voice_file_id else None,
+    }
+
+
+def _video_item(record, video, viewer):
+    """3-topshiriq: yurish videosi kartasi — rotadosh tekshiruvchi bo'lsa tasdiq/rad tugmalari bilan."""
+    m = record.membership
+    my_review = next((r for r in video.reviews.all() if r.reviewer_id == viewer.id), None)
+    return {
+        "type": "report", "kind": "video",
+        "at": (video.uploaded_at or record.woke_at).isoformat(),
+        "author": m.user.first_name or str(m.user), "me": m.user_id == viewer.user_id,
+        "status": {"approved": "peer_approved", "rejected": "peer_rejected"}.get(video.status, "pending"),
+        "late": False, "admin_reviewed": bool(video.admin_reviewed_at),
+        "phrase": record.phrase, "day_number": record.day_number,
+        "media": {"kind": "video", "id": video.id},
+        "proof_id": video.id,
+        # Menga tekshirish topshirilgan va hali ovoz bermaganman (o'zimnikini baholay olmayman)
+        "can_review": bool(my_review) and my_review.approved is None and m.user_id != viewer.user_id,
+        "my_vote": my_review.approved if my_review else None,
     }
 
 
@@ -274,13 +282,18 @@ def squad_chat(membership, now=None):
     viewer_id = membership.user_id
     items = []
 
-    # Chatda faqat haqiqiy raport ko'rinadi (ovoz yoki video). Faqat uyg'onganlar — safda sanaladi, karta emas.
+    # Chatda haqiqiy raportlar: ovoz va video alohida kartalar. Faqat uyg'onganlar — safda, karta emas.
     for record in (
         DayRecord.objects.filter(membership__squad=squad, date=date)
         .filter(Q(voice_at__isnull=False) | Q(video__isnull=False))
         .select_related("membership__user", "video")
+        .prefetch_related("video__reviews")
     ):
-        items.append(_report_item(record, viewer_id))
+        if record.voice_at:
+            items.append(_voice_item(record, membership))
+        video = getattr(record, "video", None)
+        if video:
+            items.append(_video_item(record, video, membership))
 
     # 2-topshiriq: iliq suv rasmlari — rotadoshlar ko'radi
     for record in (

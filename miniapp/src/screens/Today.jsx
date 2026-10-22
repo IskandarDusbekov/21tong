@@ -1,13 +1,14 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   AlarmClock, Ban, BedDouble, Camera, Check, CheckCircle2, Clock, Coins, Footprints, GlassWater, Hourglass,
   Lock, Megaphone, MessagesSquare, Mic, Moon, ShieldCheck, Snowflake, Sun, Sunrise, Timer, Users, Video, XCircle,
 } from "lucide-react";
-import { api, uploadWater } from "../api.js";
-import { Avatar, Empty, ErrorCard, haptic, Sheet, Skeleton, useAction, useLoad, useToast } from "../ui.jsx";
+import { api } from "../api.js";
+import { Avatar, Empty, ErrorCard, haptic, Sheet, Skeleton, useAction, useLoad } from "../ui.jsx";
 import { sound } from "../sound.js";
 import { stageIcon } from "./Journey.jsx";
 import VideoRecorder from "./VideoRecorder.jsx";
+import PhotoCapture from "./PhotoCapture.jsx";
 
 /** "Uyg'ondim" marosimi — quyosh portlashi, bir lahzaga to'liq ekran. */
 function WakeRitual() {
@@ -150,7 +151,7 @@ function Task({ n, icon: Icon, state, title, tag, hint, coins, earned, children 
 }
 
 /** Kunlik 3 topshiriq: ① uyg'onish + ovozli raport, ② iliq suv (rasm), ③ ko'chada yurish (video). */
-function Tasks({ t, gender, rules, onRecord, onWater, waterBusy }) {
+function Tasks({ t, gender, rules, onRecord, onWater }) {
   const c = t.coins || {};
   const voiceOk = t.voice && !t.voice_late;
 
@@ -206,8 +207,8 @@ function Tasks({ t, gender, rules, onRecord, onWater, waterBusy }) {
         />
         <Task n={2} icon={GlassWater} state={s2} title="Iliq suv ichish" hint={hint2} coins={c.water?.amount} earned={c.water?.earned}>
           {s2 === "active" && (
-            <button className="btn btn-primary btn-sm task-btn" disabled={waterBusy} onClick={onWater}>
-              <Camera size={16} /> {waterBusy ? "Yuborilmoqda…" : "Rasmga olish"}
+            <button className="btn btn-primary btn-sm task-btn" onClick={onWater}>
+              <Camera size={16} /> Rasmga olish
             </button>
           )}
         </Task>
@@ -367,27 +368,8 @@ export default function Today({ me, error, reload }) {
   const [askFreeze, setAskFreeze] = useState(false);
   const [ritual, setRitual] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [waterBusy, setWaterBusy] = useState(false);
-  const waterInput = useRef(null);
-  const toast = useToast();
+  const [capturing, setCapturing] = useState(false);
   const [run, busy] = useAction(reload);
-
-  const onWaterFile = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setWaterBusy(true);
-    try {
-      await uploadWater(file);
-      sound.success();
-      toast("Iliq suv qabul qilindi — tanga berildi!");
-      reload();
-    } catch (err) {
-      toast(err.message, "error");
-    } finally {
-      setWaterBusy(false);
-    }
-  };
 
   const doWake = () => {
     setRitual(true);
@@ -412,7 +394,6 @@ export default function Today({ me, error, reload }) {
       <Hero me={me} />
       <Stats me={me} />
 
-      <input ref={waterInput} type="file" accept="image/*" capture="environment" hidden onChange={onWaterFile} />
       <div className="section-title">Bugun</div>
       {banner ? (
         <div className={`banner ${banner.tone}`}>
@@ -430,7 +411,7 @@ export default function Today({ me, error, reload }) {
           {t.woke && t.phrase && (!t.voice || !t.video) && <OrderCard t={t} />}
           <Tasks
             t={t} gender={me.gender} rules={me.journey.rules}
-            onRecord={() => setRecording(true)} onWater={() => waterInput.current?.click()} waterBusy={waterBusy}
+            onRecord={() => setRecording(true)} onWater={() => setCapturing(true)}
           />
           {!t.woke && (
             <button className="btn btn-primary btn-xl btn-block wake-btn" disabled={busy} onClick={doWake}>
@@ -463,6 +444,9 @@ export default function Today({ me, error, reload }) {
       )}
       {recording && (
         <VideoRecorder onClose={() => setRecording(false)} onDone={() => { setRecording(false); reload(); }} />
+      )}
+      {capturing && (
+        <PhotoCapture onClose={() => setCapturing(false)} onDone={() => { setCapturing(false); reload(); }} />
       )}
     </div>
   );

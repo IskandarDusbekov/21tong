@@ -60,16 +60,17 @@ function PlayButton({ media }) {
   );
 }
 
-function ReportCard({ it }) {
+function ReportCard({ it, onReload }) {
   const s = REPORT_STATUS[it.status] || REPORT_STATUS.pending;
   const Kind = it.kind === "video" ? Video : Mic;
+  const [run, busy] = useAction(onReload);
   return (
     <div className={`chat-report ${it.me ? "me" : ""} tone-${s.tone}`}>
       <div className="chat-report-head">
         <Avatar name={it.author} />
         <div className="chat-report-who">
           <b>{it.author}{it.me && <span className="tag" style={{ marginLeft: 6 }}>siz</span>}</b>
-          <small className="muted"><Kind size={12} /> {it.kind === "video" ? "Video raport" : "Ovozli raport"} · {it.day_number}-kun</small>
+          <small className="muted"><Kind size={12} /> {it.kind === "video" ? "Yurish videosi" : "Ovozli raport"} · {it.day_number}-kun</small>
         </div>
         <small className="muted num chat-time">{fmtTime(it.at)}</small>
       </div>
@@ -79,6 +80,22 @@ function ReportCard({ it }) {
         <span className={`tag ${s.tone}`}><s.icon size={11} /> {s.label}</span>
         {it.admin_reviewed && <span className="tag info"><ShieldCheck size={11} /> Admin tekshirdi</span>}
       </div>
+      {it.can_review && (
+        <div className="chat-review">
+          <button className="btn btn-soft" disabled={busy} onClick={() => run(() => api.voteVideo(it.proof_id, true), "Tasdiqladingiz")} style={{ color: "var(--ok)" }}>
+            <CheckCircle2 size={16} /> Tasdiqlayman
+          </button>
+          <button className="btn btn-soft" disabled={busy} onClick={() => run(() => api.voteVideo(it.proof_id, false), "Rad etdingiz")} style={{ color: "var(--bad)" }}>
+            <XCircle size={16} /> Rad etaman
+          </button>
+        </div>
+      )}
+      {it.my_vote != null && (
+        <div className="chat-voted" style={{ color: it.my_vote ? "var(--ok)" : "var(--bad)" }}>
+          {it.my_vote ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
+          Siz {it.my_vote ? "tasdiqladingiz" : "rad etdingiz"}
+        </div>
+      )}
     </div>
   );
 }
@@ -160,8 +177,8 @@ function ReflectionCard({ it, onFire }) {
   );
 }
 
-function ChatItem({ it, onFire }) {
-  if (it.type === "report") return <ReportCard it={it} />;
+function ChatItem({ it, onFire, onReload }) {
+  if (it.type === "report") return <ReportCard it={it} onReload={onReload} />;
   if (it.type === "water") return <WaterCard it={it} />;
   if (it.type === "message") return <Bubble it={it} />;
   if (it.type === "reflection") return <ReflectionCard it={it} onFire={onFire} />;
@@ -274,7 +291,7 @@ export default function Chat({ me }) {
             text={data.prestart ? "Rotadoshlaringiz bilan tanishing — birinchi xabarni yozing." : "Birinchi raport va xabarlar shu yerda paydo bo'ladi."}
           />
         ) : (
-          data.items.map((it, i) => <ChatItem key={`${it.type}-${it.at}-${i}`} it={it} onFire={(id) => run(() => api.fire(id))} />)
+          data.items.map((it, i) => <ChatItem key={`${it.type}-${it.at}-${i}`} it={it} onFire={(id) => run(() => api.fire(id))} onReload={reload} />)
         )}
       </div>
 

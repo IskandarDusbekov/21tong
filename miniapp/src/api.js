@@ -119,5 +119,6 @@ export const api = {
   photos: () => request("/photos/"),
   votePhoto: (id) => request(`/photos/${id}/vote/`, { method: "POST" }),
   ranking: () => request("/leaderboard/"),
+  voteVideo: (proofId, approved) => request(`/video/${proofId}/vote/`, { method: "POST", body: { approved } }),
   devUsers: () => request("/dev/users/"),
 };

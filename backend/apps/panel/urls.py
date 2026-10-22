@@ -29,5 +29,6 @@ urlpatterns = [
     path("slots/<int:pk>/", cfg.SlotView.as_view()),
     path("broadcasts/", cfg.BroadcastsView.as_view()),
     path("videos/", cfg.VideosView.as_view()),
+    path("videos/<int:pk>/watch", cfg.VideoFileView.as_view()),
     path("videos/<int:pk>/<str:decision>/", cfg.VideoDecisionView.as_view()),
 ]

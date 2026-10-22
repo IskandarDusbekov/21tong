@@ -10,7 +10,7 @@ from django.utils import timezone
 from rest_framework import exceptions, serializers
 from rest_framework.response import Response
 
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 
 from apps.accounts.models import User
 from apps.camp import services
@@ -385,9 +385,22 @@ class VideosView(PanelView):
                 "day": v.day.day_number, "phrase": v.day.phrase, "status": v.status,
                 "status_label": v.get_status_display(), "uploaded_at": v.uploaded_at,
                 "votes": list(v.reviews.values_list("approved", flat=True)),
+                "has_video": bool(v.file or v.telegram_file_id),
             }
             for v in qs[:200]
         ])
+
+
+class VideoFileView(PanelView):
+    """Admin yurish videosini ko'rishi uchun — lokal fayl yoki Telegram'dan."""
+
+    def get(self, request, pk):
+        v = get_object_or_404(VideoProof, pk=pk)
+        if v.file:
+            ctype = "video/webm" if v.file.name.endswith(".webm") else "video/mp4"
+            return FileResponse(v.file.open("rb"), content_type=ctype)
+        from apps.api.miniapp import _stream_telegram_file
+        return _stream_telegram_file(v.telegram_file_id, "video/mp4")
 
 
 class VideoDecisionView(PanelView):

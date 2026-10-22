@@ -1,7 +1,9 @@
 """Telegram Mini App API. Foydalanuvchi initData (yoki lokal dev kirish) orqali aniqlanadi."""
+import logging
+
 import httpx
 from django.conf import settings
-from django.http import FileResponse, Http404, HttpResponse, StreamingHttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import exceptions
 from rest_framework.permissions import IsAuthenticated
@@ -16,9 +18,11 @@ from apps.camp.models import Award, DayRecord
 from apps.community import services as community
 from apps.community.models import Bounty, PhotoEntry, Reflection
 from apps.proofs import services as proofs_services
-from apps.proofs.models import VideoProof
+from apps.proofs.models import Review, VideoProof
 
 from .common import membership_summary
+
+log = logging.getLogger(__name__)
 
 
 class AppView(APIView):
@@ -113,21 +117,25 @@ class ChatView(AppView):
 
 
 def _stream_telegram_file(file_id, content_type):
-    """Raport media'sini (ovoz/video) Telegram'dan oqim qilib qaytaradi — ilovada eshitiladi/ko'riladi."""
+    """Raport media'sini (ovoz/video) Telegram'dan olib qaytaradi — ilovada eshitiladi/ko'riladi.
+    Fayllar kichik (ovoz ~100KB, video krujok bir necha MB) — to'liq yuklab beramiz: oqim'ga
+    nisbatan ancha ishonchli (gunicorn ostida ham to'g'ri ishlaydi)."""
     token = settings.TELEGRAM_BOT_TOKEN
     if not token or not file_id or file_id.startswith("demo-"):
         raise Http404
     base = f"https://api.telegram.org/bot{token}"
     try:
-        info = httpx.get(f"{base}/getFile", params={"file_id": file_id}, timeout=15).json()
+        info = httpx.get(f"{base}/getFile", params={"file_id": file_id}, timeout=20).json()
+        if not info.get("ok"):
+            log.warning("getFile muvaffaqiyatsiz: %s", info.get("description"))
+            raise Http404
         path = info["result"]["file_path"]
-        upstream = httpx.stream("GET", f"https://api.telegram.org/file/bot{token}/{path}", timeout=60)
-    except (httpx.HTTPError, KeyError, TypeError):
+        r = httpx.get(f"https://api.telegram.org/file/bot{token}/{path}", timeout=60)
+        r.raise_for_status()
+    except (httpx.HTTPError, KeyError, TypeError) as e:
+        log.warning("Telegram fayl olinmadi (%s): %s", file_id[:12], e)
         raise Http404
-    cm = upstream.__enter__()
-    resp = StreamingHttpResponse(
-        (chunk for chunk in cm.iter_bytes()), content_type=cm.headers.get("content-type", content_type)
-    )
+    resp = HttpResponse(r.content, content_type=r.headers.get("content-type", content_type))
     resp["Cache-Control"] = "private, max-age=86400"
     return resp
 
@@ -150,6 +158,17 @@ class ProofMediaView(AppView):
                 return FileResponse(proof.file.open("rb"), content_type=ctype)
             return _stream_telegram_file(proof.telegram_file_id, "video/mp4")
         raise Http404
+
+
+class VideoVoteView(AppView):
+    """Rotadosh yurish videosini ilova ichida tasdiqlaydi/rad etadi (bot o'rniga)."""
+
+    def post(self, request, pk):
+        m = self.membership()
+        proof = get_object_or_404(VideoProof, pk=pk, day__membership__squad=m.squad_id)
+        review = get_object_or_404(Review, proof=proof, reviewer=m)
+        proof = proofs_services.cast_vote(review, m, bool(request.data.get("approved")))
+        return Response({"status": proof.status})
 
 
 class WaterUploadView(AppView):

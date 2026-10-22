@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Quote, Video, X } from "lucide-react";
+import { Check, Play, Quote, Video, X } from "lucide-react";
 import { api } from "../api.js";
 import { go } from "../router.js";
 import { Empty, ErrorBox, PageHead, Person, Pill, Seg, Skeleton, fmtAgo, useAction, useLoad } from "../ui.jsx";
@@ -18,6 +18,7 @@ function Votes({ votes }) {
 
 export default function Videos({ onChange }) {
   const [status, setStatus] = useState("reviewing");
+  const [playing, setPlaying] = useState(null);
   const { data, error, reload } = useLoad(() => api.videos(status), [status]);
   const [run, busy] = useAction(async () => { await reload(); onChange?.(); });
 
@@ -43,6 +44,11 @@ export default function Videos({ onChange }) {
               </div>
               <div className="spacer" />
               <Votes votes={v.votes} />
+              {v.has_video && (
+                <button className="btn btn-outline btn-sm" onClick={() => setPlaying(playing === v.id ? null : v.id)}>
+                  <Play size={15} /> {playing === v.id ? "Yopish" : "Ko'rish"}
+                </button>
+              )}
               {v.status === "reviewing" ? (
                 <>
                   <button className="btn btn-ok btn-sm" disabled={busy} onClick={() => run(() => api.videoDecide(v.id, "approve"))}><Check size={15} /> Tasdiqlash</button>
@@ -52,6 +58,9 @@ export default function Videos({ onChange }) {
                 <Pill tone={v.status === "approved" ? "ok" : "bad"} dot>{v.status_label}</Pill>
               )}
             </div>
+            {playing === v.id && v.has_video && (
+              <video className="panel-video" src={api.videoUrl(v.id)} controls autoPlay playsInline />
+            )}
             {v.phrase && (
               <div className="row small" style={{ gap: 8, marginTop: 12, padding: "8px 12px", background: "var(--surface-2)", borderRadius: 10 }}>
                 <Quote size={14} color="var(--sun)" /> O'qilishi kerak edi: <i>«{v.phrase}»</i>
