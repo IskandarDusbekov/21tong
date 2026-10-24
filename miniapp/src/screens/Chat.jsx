@@ -150,10 +150,10 @@ function SystemItem({ it }) {
 
 function Bubble({ it }) {
   return (
-    <div className={`chat-bubble ${it.me ? "me" : ""}`}>
+    <div className={`chat-bubble ${it.me ? "me" : ""} ${it.mentor ? "mentor" : ""}`}>
       {!it.me && <Avatar name={it.author} avatar={it.avatar} size={30} />}
       <div className="chat-bubble-body">
-        {!it.me && <b className="chat-bubble-author">{it.author}</b>}
+        {!it.me && <b className="chat-bubble-author">{it.mentor && "⭐ "}{it.author}</b>}
         <p>{it.text}</p>
         <small className="chat-bubble-time num">{fmtTime(it.at)}</small>
       </div>

@@ -200,7 +200,9 @@ class AvatarByIdView(AppView):
     def get(self, request, pk):
         target = get_object_or_404(User, pk=pk)
         viewer_cohorts = set(request.user.memberships.values_list("cohort_id", flat=True))
-        if pk != request.user.id and not target.memberships.filter(cohort_id__in=viewer_cohorts).exists():
+        # Admin har rotada mentor — uning rasmini hamma ko'radi
+        if (pk != request.user.id and not target.is_staff
+                and not target.memberships.filter(cohort_id__in=viewer_cohorts).exists()):
             raise Http404
         if not target.avatar:
             raise Http404

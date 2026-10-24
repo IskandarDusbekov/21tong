@@ -7,6 +7,6 @@ export default defineConfig({
   server: {
     port: 5174,
     // Lokal ishlab chiqishda API Django'ga yo'naltiriladi (sessiya cookie'lari bir domenda qoladi)
-    proxy: { "/api": "http://localhost:8000" },
+    proxy: { "/api": process.env.API_URL || "http://localhost:8000" },
   },
 });

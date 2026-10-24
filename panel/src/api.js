@@ -98,5 +98,6 @@ export const api = {
 
   chats: () => request("/chats/"),
   squadChat: (id) => request(`/chats/${id}/`),
+  sendMentorMessage: (id, text) => request(`/chats/${id}/`, { method: "POST", body: { text } }),
   deleteChatMessage: (id) => request(`/chat-messages/${id}/`, { method: "DELETE" }),
 };

@@ -20,10 +20,11 @@ from apps.camp.models import Award, Cohort, Membership, Notification, Squad, Wak
 from apps.control import defaults
 from apps.control.models import SETTINGS_GROUPS, BotMessage, Broadcast, CampSettings, Phrase, Stage
 from apps.control.services import broadcast_recipients, send_broadcast
+from apps.community import services as community
 from apps.community.models import Bounty, SquadMessage
 from apps.proofs.models import VideoProof
 
-from .base import PanelView, person
+from .base import PanelView, hhmm, person
 
 
 def validation_error(exc: ValidationError):
@@ -439,45 +440,67 @@ class BountyView(PanelView):
 
 # --- Rota chatlarini kuzatish (moderatsiya) -------------------------------------------
 
+def _msg_author(msg):
+    if msg.mentor_id or not msg.author:
+        return community.mentor_name(msg.mentor)
+    return msg.author.user.first_name or "—"
+
+
 class ChatsView(PanelView):
-    """Running oqimlardagi rotalar: bugungi xabarlar soni va oxirgisi — qaysi rotada muloqot ketyapti."""
+    """
+    Qabul ochiq va davom etayotgan oqimlardagi rotalar (guruhlar): a'zolar, bugungi xabarlar soni va oxirgisi.
+    Admin har bir rotada mentor — shu yerdan yozadi.
+    """
 
     def get(self, request):
         today = services.local_now().date()
-        squads = Squad.objects.filter(tribe__cohort__status=Cohort.Status.RUNNING).select_related("tribe__cohort")
+        squads = (
+            Squad.objects.exclude(tribe__cohort__status=Cohort.Status.FINISHED)
+            .select_related("tribe__cohort")
+            .order_by("tribe__cohort__start_date", "number")
+        )
         rows = []
         for s in squads:
             msgs = SquadMessage.objects.filter(squad=s, created_at__date=today)
-            last = msgs.select_related("author__user").order_by("-created_at").first()
+            last = msgs.select_related("author__user", "mentor").order_by("-created_at").first()
+            members = s.memberships.filter(status=Membership.Status.ACTIVE).select_related("user")
             rows.append({
-                "id": s.id, "squad": s.name, "tribe": str(s.tribe), "cohort": s.tribe.cohort.name,
+                "id": s.id, "squad": s.name, "number": s.number,
+                "tribe": str(s.tribe), "gender": s.tribe.gender, "wake": hhmm(s.tribe.start_wake_time),
+                "cohort": s.tribe.cohort.name, "cohort_status": s.tribe.cohort.status,
+                "members": [m.user.first_name or str(m.user) for m in members],
                 "count": msgs.count(),
-                "last": {
-                    "author": (last.author.user.first_name if last.author and last.author.user else "—"),
-                    "text": last.text, "at": last.created_at,
-                } if last else None,
+                "last": {"author": _msg_author(last), "text": last.text, "at": last.created_at,
+                         "mentor": bool(last.mentor_id)} if last else None,
             })
-        rows.sort(key=lambda r: (r["last"]["at"] if r["last"] else dt.datetime.min.replace(tzinfo=dt.timezone.utc)), reverse=True)
         return Response(rows)
 
 
 class SquadChatView(PanelView):
-    """Bitta rota chati (bugungi) — admin yomon so'z/kelishmovchilikni ko'rishi uchun."""
+    """Bitta rota chati (bugungi): admin kuzatadi, mentor sifatida yozadi va yomon xabarni o'chiradi."""
 
     def get(self, request, pk):
         squad = get_object_or_404(Squad.objects.select_related("tribe__cohort"), pk=pk)
         today = services.local_now().date()
         msgs = (
             SquadMessage.objects.filter(squad=squad, created_at__date=today)
-            .select_related("author__user").order_by("created_at")
+            .select_related("author__user", "mentor").order_by("created_at")
         )
         return Response({
             "squad": squad.name, "tribe": str(squad.tribe),
             "messages": [{
-                "id": msg.id, "author": (msg.author.user.first_name if msg.author and msg.author.user else "—"),
+                "id": msg.id, "author": _msg_author(msg), "mentor": bool(msg.mentor_id),
                 "membership_id": msg.author_id, "text": msg.text, "at": msg.created_at,
             } for msg in msgs],
         })
+
+    def post(self, request, pk):
+        squad = get_object_or_404(Squad, pk=pk)
+        try:
+            msg = community.post_mentor_message(squad, request.user, request.data.get("text"))
+        except services.RuleError as e:
+            return Response({"detail": str(e)}, status=400)
+        return Response({"id": msg.id}, status=201)
 
 
 class ChatMessageView(PanelView):

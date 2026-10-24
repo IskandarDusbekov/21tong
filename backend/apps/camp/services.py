@@ -6,7 +6,7 @@ import datetime as dt
 from dataclasses import dataclass
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 
 from apps.accounts.models import Gender, Region, User
@@ -228,7 +228,10 @@ def join_cohort(user, cohort: Cohort, start_wake_time: dt.time, target_wake_time
 
 
 def assign_squad(tribe):
-    """Bo'sh joyi bor birinchi rota; hammasi to'lgan bo'lsa — yangi rota ochiladi."""
+    """
+    Bo'sh joyi bor birinchi rota; hammasi to'lgan bo'lsa — yangi rota ochiladi.
+    Raqam butun oqim bo'yicha davom etadi — boshqa qabiladagi rota bilan nomi takrorlanmaydi.
+    """
     squads = (
         Squad.objects.filter(tribe=tribe)
         .annotate(size=Count("memberships", filter=Q(memberships__status=Membership.Status.ACTIVE)))
@@ -237,7 +240,7 @@ def assign_squad(tribe):
     for squad in squads:
         if squad.size < rules.current().squad_size:
             return squad
-    last = max((s.number for s in squads), default=0)
+    last = Squad.objects.filter(tribe__cohort_id=tribe.cohort_id).aggregate(n=Max("number"))["n"] or 0
     return Squad.objects.create(tribe=tribe, number=last + 1)
 
 

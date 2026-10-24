@@ -168,6 +168,20 @@ class PanelDataTests(PanelTestCase):
         self.assertEqual(self.client.delete(f"/api/panel/chat-messages/{msg_id}/").status_code, 204)
         self.assertFalse(SquadMessage.objects.filter(pk=msg_id).exists())
 
+    def test_admin_writes_as_mentor_any_time(self):
+        from apps.community import services as community
+        m = self.make_member(1)
+        # Oyna yopiq bo'lsa ham mentor yoza oladi
+        resp = self.client.post(f"/api/panel/chats/{m.squad_id}/", {"text": "Ertaga start!"}, format="json")
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(self.client.post(f"/api/panel/chats/{m.squad_id}/", {"text": " "}, format="json").status_code, 400)
+        thread = self.client.get(f"/api/panel/chats/{m.squad_id}/").json()
+        self.assertTrue(thread["messages"][0]["mentor"])
+        item = next(it for it in community.squad_chat(m)["items"] if it["type"] == "message")
+        self.assertTrue(item["mentor"])
+        self.assertFalse(item["me"])
+        self.assertTrue(item["author"].startswith("Mentor"))
+
 
 
 

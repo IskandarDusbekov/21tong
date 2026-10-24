@@ -450,6 +450,7 @@ button:disabled { cursor: default; }
 .chat-bubble-body { background: var(--surface); border-radius: 16px; padding: 10px 14px; box-shadow: var(--shadow); }
 .chat-bubble.me .chat-bubble-body { background: linear-gradient(135deg, var(--sun-2), var(--sun)); color: #fff; }
 .chat-bubble-author { font-size: 12.5px; font-weight: 700; color: var(--sun); display: block; margin-bottom: 3px; }
+.chat-bubble.mentor .chat-bubble-body { border: 1.5px solid var(--sun); }
 .chat-bubble-body p { margin: 0; font-size: 15px; line-height: 1.42; overflow-wrap: anywhere; }
 .chat-bubble-time { font-size: 10.5px; opacity: .7; display: block; text-align: right; margin-top: 3px; }
 

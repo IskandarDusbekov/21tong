@@ -354,12 +354,16 @@ def squad_chat(membership, now=None):
                       "stage": a.stage.name, "day": a.stage.day, "icon": a.stage.icon})
 
     for msg in (
-        SquadMessage.objects.filter(squad=squad, created_at__date=date).select_related("author__user")
+        SquadMessage.objects.filter(squad=squad, created_at__date=date).select_related("author__user", "mentor")
     ):
-        author = msg.author.user.first_name if msg.author and msg.author.user.first_name else "Ishtirokchi"
+        if msg.mentor_id or not msg.author:
+            items.append({"type": "message", "at": msg.created_at.isoformat(), "author": mentor_name(msg.mentor),
+                          "me": False, "mentor": True, "text": msg.text,
+                          "avatar": _avatar(msg.mentor) if msg.mentor else None})
+            continue
+        author = msg.author.user.first_name or "Ishtirokchi"
         items.append({"type": "message", "at": msg.created_at.isoformat(), "author": author,
-                      "me": bool(msg.author and msg.author.user_id == viewer_id), "text": msg.text,
-                      "avatar": _avatar(msg.author.user) if msg.author else None})
+                      "me": msg.author.user_id == viewer_id, "text": msg.text, "avatar": _avatar(msg.author.user)})
 
     # Kechki refleksiya ham chatda — 🔥 bilan
     reflections = (
@@ -411,3 +415,16 @@ def post_chat_message(membership, text, now=None):
     if not window_state(membership.cohort, now)["open"]:
         raise RuleError("Hozir oyna yopiq — faqat kuzatish mumkin. Chat belgilangan vaqtda ochiladi.")
     return SquadMessage.objects.create(squad_id=membership.squad_id, author=membership, text=text[:1000])
+
+
+def mentor_name(user):
+    name = (user.first_name if user else "") or ""
+    return f"Mentor · {name}" if name else "Mentor"
+
+
+def post_mentor_message(squad, admin, text):
+    """Admin (mentor) rota chatiga yozadi — oyna cheklovi yo'q."""
+    text = (text or "").strip()
+    if not text:
+        raise RuleError("Xabar bo'sh bo'lmasin.")
+    return SquadMessage.objects.create(squad=squad, mentor=admin, text=text[:1000])

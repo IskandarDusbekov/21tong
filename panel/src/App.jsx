@@ -27,7 +27,7 @@ const NAV = [
     { id: "members", title: "Ishtirokchilar", icon: Users, page: Members },
     { id: "squads", title: "Rotalar", icon: UsersRound, page: Squads },
     { id: "videos", title: "Video raportlar", icon: Video, page: Videos, badge: "videos_reviewing" },
-    { id: "chats", title: "Rota chatlari", icon: MessagesSquare, page: Chats },
+    { id: "chats", title: "Guruhlar", icon: MessagesSquare, page: Chats },
   ] },
   { label: "Lager", items: [
     { id: "cohorts", title: "Oqimlar", icon: CalendarRange, page: Cohorts },

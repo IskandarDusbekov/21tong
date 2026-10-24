@@ -14,7 +14,10 @@ class SquadMessage(models.Model):
     squad = models.ForeignKey(Squad, on_delete=models.CASCADE, related_name="messages", verbose_name="Rota")
     author = models.ForeignKey(Membership, null=True, blank=True, on_delete=models.SET_NULL,
                                related_name="messages", verbose_name="Muallif")
-    text = models.CharField("Matn", max_length=1000)
+    # Admin har bir rotada mentor — paneldan yozadi, oyna yopiq bo'lsa ham.
+    mentor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name="mentor_messages", verbose_name="Mentor (admin)")
+    text =models.CharField("Matn", max_length=1000)
     created_at = models.DateTimeField("Vaqt", auto_now_add=True)
 
     class Meta:
@@ -24,7 +27,7 @@ class SquadMessage(models.Model):
         verbose_name_plural = "Rota chati xabarlari"
 
     def __str__(self):
-        return f"{self.author or 'tizim'}: {self.text[:30]}"
+        return f"{self.author or self.mentor or 'tizim'}: {self.text[:30]}"
 
 
 class Reflection(models.Model):

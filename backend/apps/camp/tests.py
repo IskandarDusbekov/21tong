@@ -256,7 +256,8 @@ class CampDisciplineTests(CampTestCase):
         self.assertEqual(members[7].squad.number, 2)
         self.assertEqual(members[7].squad.tribe_id, members[0].tribe_id)
         girl = self.make_member(100, "F")
-        self.assertEqual(girl.squad.number, 1)
+        # Boshqa qabila — lekin nomi takrorlanmaydi: raqam oqim bo'yicha davom etadi
+        self.assertEqual(girl.squad.number, 3)
         self.assertNotEqual(girl.squad_id, members[0].squad_id)
 
     def test_reviewers_prefer_own_squad(self):
